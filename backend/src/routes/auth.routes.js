@@ -52,7 +52,8 @@ router.post('/login', [
             id: user.id,
             name: user.name,
             role: role,
-            userType: userType
+            userType: userType,
+            school_level: user.school_level
         });
 
         console.log('Login successful:', { username, role });
@@ -62,7 +63,8 @@ router.post('/login', [
                 id: user.id,
                 name: user.name,
                 role: role,
-                userType: userType
+                userType: userType,
+                school_level: user.school_level
             }
         });
     } catch (error) {
@@ -99,6 +101,7 @@ router.post('/register', authenticateToken, upload.single('photo'), [
 
     const { name, userType, password, username, barcode, className, role } = req.body;
     const photo = req.file ? `/uploads/photos/${req.file.filename}` : null;
+    const school_level = req.user.school_level; // Inherit from logged-in admin
 
     try {
         const passwordHash = await bcrypt.hash(password, 10);
@@ -109,8 +112,8 @@ router.post('/register', authenticateToken, upload.single('photo'), [
             }
 
             const result = await dbRun(
-                'INSERT INTO users (name, role, username, password_hash) VALUES (?, ?, ?, ?)',
-                [name, role || 'Admin', username, passwordHash]
+                'INSERT INTO users (name, role, school_level, username, password_hash) VALUES (?, ?, ?, ?, ?)',
+                [name, role || 'Admin', school_level, username, passwordHash]
             );
 
             res.status(201).json({
@@ -123,8 +126,8 @@ router.post('/register', authenticateToken, upload.single('photo'), [
             }
 
             const result = await dbRun(
-                'INSERT INTO students (name, class, barcode, password_hash, photo) VALUES (?, ?, ?, ?, ?)',
-                [name, className, barcode, passwordHash, photo]
+                'INSERT INTO students (name, class, school_level, barcode, password_hash, photo) VALUES (?, ?, ?, ?, ?, ?)',
+                [name, className, school_level, barcode, passwordHash, photo]
             );
 
             res.status(201).json({
@@ -138,8 +141,8 @@ router.post('/register', authenticateToken, upload.single('photo'), [
             }
 
             const result = await dbRun(
-                'INSERT INTO teachers (name, barcode, password_hash, photo) VALUES (?, ?, ?, ?)',
-                [name, barcode, passwordHash, photo]
+                'INSERT INTO teachers (name, school_level, barcode, password_hash, photo) VALUES (?, ?, ?, ?, ?)',
+                [name, school_level, barcode, passwordHash, photo]
             );
 
             res.status(201).json({

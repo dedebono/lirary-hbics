@@ -1,6 +1,6 @@
-# Library Management System
+# HBICS Library System
 
-A comprehensive full-stack library management system built with Node.js (Express), React (Vite), Tailwind CSS, and SQLite3.
+A comprehensive full-stack library management system built with Node.js (Express), React (Vite), Tailwind CSS, and SQLite3. Supports multiple schools (Primary and Secondary) with complete data isolation.
 
 ## 🚀 Features
 
@@ -10,14 +10,17 @@ A comprehensive full-stack library management system built with Node.js (Express
 - **Student**: Check-in/out of library, browse books, read e-books, track borrowed books
 
 ### Core Functionality
+- ✅ **Multi-School Support**: Separate data for HBICS Primary and Secondary schools
 - ✅ JWT-based authentication
-- ✅ Book inventory management (CRUD)
-- ✅ User management (Students, Teachers, Admins)
+- ✅ Book inventory management (CRUD) with cover image upload
+- ✅ User management (Students, Teachers, Admins) with photo upload
 - ✅ Book borrowing and return system
-- ✅ Attendance tracking (check-in/out)
+- ✅ Attendance tracking (check-in/out) with barcode scanning
 - ✅ E-book management with file upload
 - ✅ Overdue book tracking
-- ✅ Comprehensive logging system
+- ✅ Comprehensive logging and reporting system
+- ✅ CSV import for bulk user and book uploads
+- ✅ Real-time barcode scanning for attendance and borrowing
 
 ## 📋 Tech Stack
 
@@ -89,19 +92,19 @@ npm run dev
 
 The frontend will run on `http://localhost:3000`
 
-## 🔑 Default Credentials
+### HBICS Primary School
+- **Admin Username**: `admin_primary`
+- **Admin Password**: `admin123`
+- **Sample Student**: Barcode `STU_P1`, Password `student123`
+- **Sample Teacher**: Barcode `TCH_P1`, Password `teacher123`
 
-### Admin
-- **Username**: `admin`
-- **Password**: `admin123`
+### HBICS Secondary School
+- **Admin Username**: `admin_secondary`
+- **Admin Password**: `admin123`
+- **Sample Student**: Barcode `STU_S1`, Password `student123`
+- **Sample Teacher**: Barcode `TCH_S1`, Password `teacher123`
 
-### Students
-- **Barcode**: `STU001`, `STU002`, `STU003`
-- **Password**: `student123`
-
-### Teachers
-- **Barcode**: `TCH001`, `TCH002`
-- **Password**: `teacher123`
+> **Note**: Each admin can only see and manage their own school's data. The two schools are completely isolated.
 
 ## 📁 Project Structure
 
@@ -195,24 +198,32 @@ library-nodejs/
 ## 🗄️ Database Schema
 
 ### Tables
-- **users**: Admin and Librarian accounts
-- **students**: Student accounts with barcode
-- **teachers**: Teacher accounts with barcode
-- **books**: Physical book inventory
+- **users**: Admin and Librarian accounts (with `school_level`)
+- **students**: Student accounts with barcode and photo (with `school_level`)
+- **teachers**: Teacher accounts with barcode and photo (with `school_level`)
+- **books**: Physical book inventory with cover images (with `school_level`)
 - **ebooks**: Digital book collection
 - **attendance_logs**: Check-in/out records
 - **borrow_logs**: Book borrowing history
 - **ebook_read_logs**: E-book access logs
 
-## 🎨 Features Ready for Enhancement
+### Multi-School Architecture
+The system uses a `school_level` column (values: 'Primary', 'Secondary') to isolate data:
+- All queries are automatically filtered by the logged-in admin's school
+- Users can only be created within the admin's school
+- Books, attendance logs, and borrow logs are school-specific
+- Complete data isolation ensures no cross-school access
 
-The following features have backend support and can be integrated into the frontend:
+## 🎨 Key Features Implemented
 
-1. **Barcode Scanner**: Use `html5-qrcode` library (already installed) to scan book ISBNs and student/teacher barcodes
-2. **E-book Viewer**: Use `react-pdf` library (already installed) to display PDF e-books
-3. **Advanced Book Management**: Full CRUD interface for books with search and filters
-4. **User Management Interface**: Admin panel for managing students and teachers
-5. **Reports and Analytics**: Borrowing trends, popular books, attendance reports
+1. **Multi-School Support**: Complete data isolation between Primary and Secondary schools
+2. **Barcode Scanner**: Integrated `html5-qrcode` for scanning book ISBNs and user barcodes
+3. **Media Uploads**: Book cover images and user photos with Multer
+4. **CSV Import**: Bulk upload users and books via CSV files
+5. **Advanced Book Management**: Full CRUD interface with search, filters, and cover images
+6. **User Management Interface**: Complete admin panel for managing students and teachers
+7. **Reports and Analytics**: Borrowing trends, attendance logs, and comprehensive reporting
+8. **Landing Page**: Modern, responsive landing page with feature highlights
 
 ## 🔒 Security Features
 

@@ -37,7 +37,7 @@ router.get('/', authenticateToken, requireAdmin, (req, res) => {
     if (expectedQueries === 0) return res.json({ users: [] });
 
     if (!userType || userType === 'admin') {
-        db.all('SELECT id, name, role, username, created_at FROM users', [], (err, admins) => {
+        db.all('SELECT id, name, role, username, created_at FROM users WHERE school_level = ?', [req.user.school_level], (err, admins) => {
             if (err) return handleError(err);
             users = users.concat((admins || []).map(u => ({ ...u, userType: 'admin' })));
             checkCompletion();
@@ -45,7 +45,7 @@ router.get('/', authenticateToken, requireAdmin, (req, res) => {
     }
 
     if (!userType || userType === 'student') {
-        db.all('SELECT id, name, class, barcode, photo, created_at FROM students', [], (err, students) => {
+        db.all('SELECT id, name, class, barcode, photo, created_at FROM students WHERE school_level = ?', [req.user.school_level], (err, students) => {
             if (err) return handleError(err);
             users = users.concat((students || []).map(u => ({ ...u, userType: 'student' })));
             checkCompletion();
@@ -53,7 +53,7 @@ router.get('/', authenticateToken, requireAdmin, (req, res) => {
     }
 
     if (!userType || userType === 'teacher') {
-        db.all('SELECT id, name, barcode, photo, created_at FROM teachers', [], (err, teachers) => {
+        db.all('SELECT id, name, barcode, photo, created_at FROM teachers WHERE school_level = ?', [req.user.school_level], (err, teachers) => {
             if (err) return handleError(err);
             users = users.concat((teachers || []).map(u => ({ ...u, userType: 'teacher' })));
             checkCompletion();
@@ -78,11 +78,11 @@ router.get('/:userType/:id', authenticateToken, requireAdmin, (req, res) => {
     };
 
     if (userType === 'admin') {
-        db.get('SELECT id, name, role, username, created_at FROM users WHERE id = ?', [id], handleUserResult);
+        db.get('SELECT id, name, role, username, created_at FROM users WHERE id = ? AND school_level = ?', [id, req.user.school_level], handleUserResult);
     } else if (userType === 'student') {
-        db.get('SELECT id, name, class, barcode, photo, created_at FROM students WHERE id = ?', [id], handleUserResult);
+        db.get('SELECT id, name, class, barcode, photo, created_at FROM students WHERE id = ? AND school_level = ?', [id, req.user.school_level], handleUserResult);
     } else if (userType === 'teacher') {
-        db.get('SELECT id, name, barcode, photo, created_at FROM teachers WHERE id = ?', [id], handleUserResult);
+        db.get('SELECT id, name, barcode, photo, created_at FROM teachers WHERE id = ? AND school_level = ?', [id, req.user.school_level], handleUserResult);
     } else {
         res.status(400).json({ error: 'Invalid user type' });
     }

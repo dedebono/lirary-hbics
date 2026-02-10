@@ -183,9 +183,12 @@ router.get('/logs', authenticateToken, requireAdmin, async (req, res) => {
       JOIN books b ON bl.book_id = b.id
       LEFT JOIN students s ON bl.user_type = 'student' AND bl.user_id = s.id
       LEFT JOIN teachers t ON bl.user_type = 'teacher' AND bl.user_id = t.id
-      WHERE 1=1
+      WHERE b.school_level = ? AND (
+          (bl.user_type = 'student' AND s.school_level = ?) OR
+          (bl.user_type = 'teacher' AND t.school_level = ?)
+      )
     `;
-    const params = [];
+    const params = [req.user.school_level, req.user.school_level, req.user.school_level];
 
     if (status) {
         query += ' AND bl.status = ?';

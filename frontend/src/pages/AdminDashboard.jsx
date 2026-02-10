@@ -159,7 +159,7 @@ const AdminDashboard = () => {
                     <div className="flex items-center gap-3">
                         <BookOpen className="w-8 h-8 text-primary-600" />
                         <div>
-                            <h1 className="text-xl font-bold text-gray-800">Library System</h1>
+                            <h1 className="text-xl font-bold text-gray-800">HBICS {user?.school_level} Library</h1>
                             <p className="text-xs text-gray-600">Admin Panel</p>
                         </div>
                     </div>

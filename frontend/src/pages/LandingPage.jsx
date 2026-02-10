@@ -25,7 +25,7 @@ const LandingPage = () => {
                     <div className="flex justify-between items-center h-16">
                         <div className="flex items-center gap-2">
                             <Library className="h-8 w-8 text-primary-600" />
-                            <span className="text-xl font-bold text-gray-900">EduLib</span>
+                            <span className="text-xl font-bold text-gray-900">HBICS Library System</span>
                         </div>
                         <div className="flex items-center gap-4">
                             {user ? (
@@ -146,7 +146,7 @@ const LandingPage = () => {
                     <div className="flex flex-col md:flex-row justify-between items-center mb-8">
                         <div className="flex items-center gap-2 mb-4 md:mb-0">
                             <Library className="h-6 w-6 text-primary-600" />
-                            <span className="text-lg font-bold text-gray-900">EduLib</span>
+                            <span className="text-lg font-bold text-gray-900">HBICS Library System</span>
                         </div>
                         <div className="text-gray-500 text-sm">
                             &copy; {new Date().getFullYear()} School Library System. All rights reserved.

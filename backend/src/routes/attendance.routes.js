@@ -117,9 +117,12 @@ router.get('/logs', authenticateToken, requireAdmin, (req, res) => {
         FROM attendance_logs al
         LEFT JOIN students s ON al.user_type = 'student' AND al.user_id = s.id
         LEFT JOIN teachers t ON al.user_type = 'teacher' AND al.user_id = t.id
-        WHERE 1=1
+        WHERE (
+            (al.user_type = 'student' AND s.school_level = ?) OR
+            (al.user_type = 'teacher' AND t.school_level = ?)
+        )
     `;
-    const params = [];
+    const params = [req.user.school_level, req.user.school_level];
 
     if (startDate) {
         query += ' AND DATE(al.timestamp) >= DATE(?)';

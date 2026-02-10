@@ -12,7 +12,7 @@ const __dirname = dirname(__filename);
 const dbPath = join(__dirname, '..', '..', 'database.sqlite');
 const db = new sqlite3.Database(dbPath);
 
-console.log('🗄️  Initializing database...');
+console.log('🗄️  Initializing database for Multi-School Support (Primary & Secondary)...');
 
 // Enable foreign keys
 db.run('PRAGMA foreign_keys = ON');
@@ -42,14 +42,16 @@ const dropTables = async () => {
 
 // Create tables
 const createTables = async () => {
-  console.log('Creating tables...');
+  console.log('Creating tables with school_level support...');
 
   // Users table (Admin/Librarian)
+  // Added school_level column
   await run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       role TEXT NOT NULL CHECK(role IN ('Admin', 'Librarian')),
+      school_level TEXT NOT NULL CHECK(school_level IN ('Primary', 'Secondary')),
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -57,34 +59,42 @@ const createTables = async () => {
   `);
 
   // Students table
+  // Added school_level column
   await run(`
     CREATE TABLE IF NOT EXISTS students (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       class TEXT NOT NULL,
+      school_level TEXT NOT NULL CHECK(school_level IN ('Primary', 'Secondary')),
       barcode TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      photo TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   // Teachers table
+  // Added school_level column
   await run(`
     CREATE TABLE IF NOT EXISTS teachers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
+      school_level TEXT NOT NULL CHECK(school_level IN ('Primary', 'Secondary')),
       barcode TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      photo TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   // Books table
+  // Added school_level column
   await run(`
     CREATE TABLE IF NOT EXISTS books (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       book_barcode TEXT UNIQUE NOT NULL,
       book_name TEXT NOT NULL,
+      school_level TEXT NOT NULL CHECK(school_level IN ('Primary', 'Secondary')),
       year INTEGER,
       author TEXT,
       publisher TEXT,
@@ -93,11 +103,17 @@ const createTables = async () => {
       status TEXT DEFAULT 'Available' CHECK(status IN ('Available', 'Unavailable')),
       available_qty INTEGER DEFAULT 0,
       book_isbn TEXT,
+      book_cover TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  // E-books table
+  // E-books table (Shared or School specific? Typically shared or can be specific. Let's make it specific for consistency if needed, but for now assuming shared unless specified.
+  // User said: "HBICS primary had their own books... HBICS Secondary had their own books..."
+  // Ebooks? Assuming shared for now as they are files. Or add school_level later.
+  // I will add school_level to be safe, defaulting to 'Primary' or making it optional for now?
+  // Let's keep Ebooks simple for now (User didn't explicitly mention separate Ebooks, just Books).
+  // I'll leave Ebooks as is for now.
   await run(`
     CREATE TABLE IF NOT EXISTS ebooks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,6 +125,7 @@ const createTables = async () => {
   `);
 
   // Attendance logs table
+  // No change needed to schema, but user filtering will need to join with users/students tables.
   await run(`
     CREATE TABLE IF NOT EXISTS attendance_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,6 +137,7 @@ const createTables = async () => {
   `);
 
   // Borrow logs table
+  // Same, filtered by book ownership or user ownership.
   await run(`
     CREATE TABLE IF NOT EXISTS borrow_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -154,11 +172,12 @@ const createIndexes = async () => {
   console.log('Creating indexes...');
 
   await run(`CREATE INDEX IF NOT EXISTS idx_books_barcode ON books(book_barcode)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(book_isbn)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_books_school ON books(school_level)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_students_barcode ON students(barcode)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_students_school ON students(school_level)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_teachers_barcode ON teachers(barcode)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_borrow_logs_status ON borrow_logs(status)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_attendance_logs_user ON attendance_logs(user_id, user_type)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_teachers_school ON teachers(school_level)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
 
   console.log('✅ Indexes created successfully');
 };
@@ -167,48 +186,69 @@ const createIndexes = async () => {
 const seedData = async () => {
   console.log('Seeding initial data...');
 
-  // Create default admin user
   const adminPassword = await bcrypt.hash(process.env.DEFAULT_ADMIN_PASSWORD || 'admin123', 10);
-  await run(
-    `INSERT INTO users (name, role, username, password_hash) VALUES (?, ?, ?, ?)`,
-    ['Administrator', 'Admin', process.env.DEFAULT_ADMIN_USERNAME || 'admin', adminPassword]
-  );
-  console.log('✅ Default admin created (username: admin, password: admin123)');
-
-  // Create sample students
   const studentPassword = await bcrypt.hash('student123', 10);
-  await run(`INSERT INTO students (name, class, barcode, password_hash) VALUES (?, ?, ?, ?)`,
-    ['John Doe', 'Grade 10A', 'STU001', studentPassword]);
-  await run(`INSERT INTO students (name, class, barcode, password_hash) VALUES (?, ?, ?, ?)`,
-    ['Jane Smith', 'Grade 10B', 'STU002', studentPassword]);
-  await run(`INSERT INTO students (name, class, barcode, password_hash) VALUES (?, ?, ?, ?)`,
-    ['Mike Johnson', 'Grade 11A', 'STU003', studentPassword]);
-  console.log('✅ Sample students created (password: student123)');
-
-  // Create sample teachers
   const teacherPassword = await bcrypt.hash('teacher123', 10);
-  await run(`INSERT INTO teachers (name, barcode, password_hash) VALUES (?, ?, ?)`,
-    ['Dr. Sarah Williams', 'TCH001', teacherPassword]);
-  await run(`INSERT INTO teachers (name, barcode, password_hash) VALUES (?, ?, ?)`,
-    ['Prof. Robert Brown', 'TCH002', teacherPassword]);
-  console.log('✅ Sample teachers created (password: teacher123)');
 
-  // Create sample books
-  const books = [
-    ['BK001', 'Introduction to Programming', 2023, 'John Smith', 'Tech Publishers', 5, 0, 'Available', 5, '978-0-123456-78-9'],
-    ['BK002', 'Data Structures and Algorithms', 2022, 'Jane Doe', 'CS Press', 3, 0, 'Available', 3, '978-0-234567-89-0'],
-    ['BK003', 'Web Development Fundamentals', 2024, 'Mike Wilson', 'Web Books Inc', 4, 0, 'Available', 4, '978-0-345678-90-1'],
-    ['BK004', 'Database Systems', 2023, 'Sarah Johnson', 'Data Publishers', 2, 0, 'Available', 2, '978-0-456789-01-2'],
-    ['BK005', 'Machine Learning Basics', 2024, 'Robert Lee', 'AI Press', 3, 0, 'Available', 3, '978-0-567890-12-3'],
+  // 1. Create Primary Admin
+  await run(
+    `INSERT INTO users (name, role, school_level, username, password_hash) VALUES (?, ?, ?, ?, ?)`,
+    ['HBICS Primary Admin', 'Admin', 'Primary', 'admin_primary', adminPassword]
+  );
+  console.log('✅ Primary Admin created (username: admin_primary, password: admin123)');
+
+  // 2. Create Secondary Admin
+  await run(
+    `INSERT INTO users (name, role, school_level, username, password_hash) VALUES (?, ?, ?, ?, ?)`,
+    ['HBICS Secondary Admin', 'Admin', 'Secondary', 'admin_secondary', adminPassword]
+  );
+  console.log('✅ Secondary Admin created (username: admin_secondary, password: admin123)');
+
+  // 3. Create Sample Students (Primary & Secondary)
+  await run(`INSERT INTO students (name, class, school_level, barcode, password_hash) VALUES (?, ?, ?, ?, ?)`,
+    ['Primary Student 1', 'P1-A', 'Primary', 'STU_P1', studentPassword]);
+
+  await run(`INSERT INTO students (name, class, school_level, barcode, password_hash) VALUES (?, ?, ?, ?, ?)`,
+    ['Secondary Student 1', 'S1-A', 'Secondary', 'STU_S1', studentPassword]);
+
+  console.log('✅ Sample students created');
+
+  // 4. Create Sample Teachers (Primary & Secondary)
+  await run(`INSERT INTO teachers (name, school_level, barcode, password_hash) VALUES (?, ?, ?, ?)`,
+    ['Primary Teacher', 'Primary', 'TCH_P1', teacherPassword]);
+
+  await run(`INSERT INTO teachers (name, school_level, barcode, password_hash) VALUES (?, ?, ?, ?)`,
+    ['Secondary Teacher', 'Secondary', 'TCH_S1', teacherPassword]);
+
+  console.log('✅ Sample teachers created');
+
+  // 5. Create Sample Books (Primary & Secondary)
+  const primaryBooks = [
+    ['BK_P001', 'Primary Science Vol 1', 'Primary', 2023, 'Author A', 'Pub A', 5, '978-P-1'],
+    ['BK_P002', 'Fun with Math', 'Primary', 2022, 'Author B', 'Pub B', 5, '978-P-2'],
   ];
 
-  for (const book of books) {
+  const secondaryBooks = [
+    ['BK_S001', 'Advanced Physics', 'Secondary', 2023, 'Author X', 'Pub X', 5, '978-S-1'],
+    ['BK_S002', 'World History', 'Secondary', 2022, 'Author Y', 'Pub Y', 5, '978-S-2'],
+  ];
+
+  for (const book of primaryBooks) {
     await run(
-      `INSERT INTO books (book_barcode, book_name, year, author, publisher, quantity, borrowed_count, status, available_qty, book_isbn) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      book
+      `INSERT INTO books (book_barcode, book_name, school_level, year, author, publisher, quantity, borrowed_count, status, available_qty, book_isbn) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'Available', ?, ?)`,
+      [book[0], book[1], book[2], book[3], book[4], book[5], book[6], book[6], book[7]]
     );
   }
+
+  for (const book of secondaryBooks) {
+    await run(
+      `INSERT INTO books (book_barcode, book_name, school_level, year, author, publisher, quantity, borrowed_count, status, available_qty, book_isbn) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'Available', ?, ?)`,
+      [book[0], book[1], book[2], book[3], book[4], book[5], book[6], book[6], book[7]]
+    );
+  }
+
   console.log('✅ Sample books created');
 
   console.log('✅ Database seeded successfully');
@@ -223,10 +263,10 @@ const seedData = async () => {
     await seedData();
 
     console.log('\n🎉 Database initialization completed successfully!');
-    console.log('\n📝 Default Credentials:');
-    console.log('   Admin: username=admin, password=admin123');
-    console.log('   Students: barcode=STU001/STU002/STU003, password=student123');
-    console.log('   Teachers: barcode=TCH001/TCH002, password=teacher123');
+    console.log('\n📝 New Credentials:');
+    console.log('   Primary Admin:   username=admin_primary,   password=admin123');
+    console.log('   Secondary Admin: username=admin_secondary, password=admin123');
+    console.log('   Students: STU_P1 (Primary), STU_S1 (Secondary), password=student123');
 
     db.close();
     process.exit(0);

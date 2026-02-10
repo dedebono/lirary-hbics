@@ -12,8 +12,8 @@ router.get('/', authenticateToken, (req, res) => {
     const { search, status } = req.query;
     const db = getDb();
 
-    let query = 'SELECT * FROM books WHERE 1=1';
-    const params = [];
+    let query = 'SELECT * FROM books WHERE school_level = ?';
+    const params = [req.user.school_level];
 
     if (search) {
         query += ' AND (book_name LIKE ? OR author LIKE ? OR book_isbn LIKE ? OR book_barcode LIKE ?)';
@@ -42,7 +42,7 @@ router.get('/:id', authenticateToken, (req, res) => {
     const { id } = req.params;
     const db = getDb();
 
-    db.get('SELECT * FROM books WHERE id = ?', [id], (err, book) => {
+    db.get('SELECT * FROM books WHERE id = ? AND school_level = ?', [id, req.user.school_level], (err, book) => {
         if (err) {
             console.error('Error fetching book:', err);
             return res.status(500).json({ error: 'Internal server error' });
@@ -59,7 +59,7 @@ router.get('/barcode/:barcode', authenticateToken, (req, res) => {
     const { barcode } = req.params;
     const db = getDb();
 
-    db.get('SELECT * FROM books WHERE book_barcode = ?', [barcode], (err, book) => {
+    db.get('SELECT * FROM books WHERE book_barcode = ? AND school_level = ?', [barcode, req.user.school_level], (err, book) => {
         if (err) {
             console.error('Error fetching book by barcode:', err);
             return res.status(500).json({ error: 'Internal server error' });
@@ -103,14 +103,15 @@ router.post('/', authenticateToken, requireAdmin, upload.single('cover'), [
     const db = getDb();
 
     const query = `
-      INSERT INTO books (book_barcode, book_name, year, author, publisher, quantity, borrowed_count, status, available_qty, book_isbn, book_cover)
-      VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+      INSERT INTO books (book_barcode, book_name, school_level, year, author, publisher, quantity, borrowed_count, status, available_qty, book_isbn, book_cover)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
     `;
 
     const status = quantity > 0 ? 'Available' : 'Unavailable';
     const params = [
         book_barcode,
         book_name,
+        req.user.school_level,
         year || null,
         author || null,
         publisher || null,
