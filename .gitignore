@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.env
+.DS_Store
+coverage/
+*.log
+*.sqlite
+backend/uploads/
+frontend/dist/
+frontend/build/
+frontend/node_modules/
+backend/node_modules/
