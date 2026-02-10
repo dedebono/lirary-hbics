@@ -90,7 +90,7 @@ const BookManagement = () => {
                 if (formData[key]) data.append(key, formData[key]);
             });
             if (selectedCover) {
-                data.append('book_cover', selectedCover);
+                data.append('cover', selectedCover);
             }
 
             if (editingBook) {
