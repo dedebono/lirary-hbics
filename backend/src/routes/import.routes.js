@@ -63,10 +63,10 @@ router.post('/import-students', authenticateToken, requireAdmin, upload.single('
                     continue;
                 }
 
-                // Insert student
+                // Insert student with school_level from authenticated admin
                 await dbRun(
-                    'INSERT INTO students (name, class, barcode, password_hash) VALUES (?, ?, ?, ?)',
-                    [record.name.trim(), record.class.trim(), record.barcode.trim(), passwordHash]
+                    'INSERT INTO students (name, class, barcode, password_hash, school_level) VALUES (?, ?, ?, ?, ?)',
+                    [record.name.trim(), record.class.trim(), record.barcode.trim(), passwordHash, req.user.school_level]
                 );
 
                 results.success.push({
@@ -135,8 +135,8 @@ router.post('/import-teachers', authenticateToken, requireAdmin, upload.single('
                 }
 
                 await dbRun(
-                    'INSERT INTO teachers (name, barcode, password_hash) VALUES (?, ?, ?)',
-                    [record.name.trim(), record.barcode.trim(), passwordHash]
+                    'INSERT INTO teachers (name, barcode, password_hash, school_level) VALUES (?, ?, ?, ?)',
+                    [record.name.trim(), record.barcode.trim(), passwordHash, req.user.school_level]
                 );
 
                 results.success.push({
@@ -214,8 +214,8 @@ router.post('/import-books', authenticateToken, requireAdmin, upload.single('fil
                 const status = quantity > 0 ? 'Available' : 'Unavailable';
 
                 await dbRun(
-                    `INSERT INTO books (book_barcode, book_name, year, author, publisher, quantity, borrowed_count, status, available_qty, book_isbn)
-                     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+                    `INSERT INTO books (book_barcode, book_name, year, author, publisher, quantity, borrowed_count, status, available_qty, book_isbn, school_level)
+                     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
                     [
                         record.book_barcode.trim(),
                         record.book_name.trim(),
@@ -225,7 +225,8 @@ router.post('/import-books', authenticateToken, requireAdmin, upload.single('fil
                         quantity,
                         status,
                         quantity,
-                        record.book_isbn || null
+                        record.book_isbn || null,
+                        req.user.school_level
                     ]
                 );
 
