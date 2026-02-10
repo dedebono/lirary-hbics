@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Book, Plus, Edit, Trash2, Search, Filter, Download } from 'lucide-react';
 import api from '../../utils/api';
 import { getImageUrl } from '../../utils/imageUrl';
+import { showLoading, showSuccess, showError, showConfirm, closeSwal } from '../../utils/notifications';
 import BookCSVImport from '../../components/BookCSVImport';
 
 const BookManagement = () => {
@@ -79,47 +80,58 @@ const BookManagement = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Show loading indicator
+        showLoading(editingBook ? 'Updating book...' : 'Adding book...');
+
         try {
             const data = new FormData();
-            data.append('book_barcode', formData.book_barcode);
-            data.append('book_name', formData.book_name);
-            data.append('author', formData.author);
-            data.append('publisher', formData.publisher);
-            data.append('year', formData.year);
-            data.append('quantity', formData.quantity);
-            data.append('book_isbn', formData.book_isbn);
-
+            Object.keys(formData).forEach(key => {
+                if (formData[key]) data.append(key, formData[key]);
+            });
             if (selectedCover) {
-                data.append('cover', selectedCover);
+                data.append('book_cover', selectedCover);
             }
 
             if (editingBook) {
                 await api.put(`/books/${editingBook.id}`, data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
+                await showSuccess('Book Updated!', 'Book has been updated successfully');
             } else {
                 await api.post('/books', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
+                await showSuccess('Book Added!', 'Book has been added successfully');
             }
+
             setShowAddModal(false);
             setEditingBook(null);
             resetForm();
             fetchBooks();
         } catch (error) {
             console.error('Submit Error:', error);
-            alert(error.response?.data?.error || 'Operation failed');
+            closeSwal();
+            showError('Operation Failed', error.response?.data?.error || 'Failed to save book');
         }
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this book?')) {
+        const confirmed = await showConfirm(
+            'Delete Book?',
+            'This action cannot be undone. Are you sure you want to delete this book?'
+        );
+
+        if (confirmed) {
+            showLoading('Deleting book...');
             try {
                 await api.delete(`/books/${id}`);
+                await showSuccess('Deleted!', 'Book has been deleted successfully');
                 fetchBooks();
             } catch (error) {
                 console.error('Error deleting book:', error);
-                alert('Failed to delete book');
+                closeSwal();
+                showError('Delete Failed', 'Failed to delete book');
             }
         }
     };

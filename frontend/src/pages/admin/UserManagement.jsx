@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Edit, Trash2, Search, Filter, Download } from 'lucide-react';
 import api from '../../utils/api';
 import { getImageUrl } from '../../utils/imageUrl';
+import { showLoading, showSuccess, showError, showConfirm, closeSwal } from '../../utils/notifications';
 import CSVImport from '../../components/CSVImport';
 
 const UserManagement = () => {
@@ -73,6 +74,10 @@ const UserManagement = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Show loading indicator
+        showLoading(editingUser ? 'Updating user...' : 'Adding user...');
+
         try {
             const data = new FormData();
             data.append('name', formData.name);
@@ -99,8 +104,10 @@ const UserManagement = () => {
 
             if (editingUser) {
                 await api.put(`/users/${userType}/${editingUser.id}`, data, config);
+                await showSuccess('User Updated!', 'User has been updated successfully');
             } else {
                 await api.post('/auth/register', data, config);
+                await showSuccess('User Added!', 'User has been added successfully');
             }
 
             setShowAddModal(false);
@@ -109,19 +116,27 @@ const UserManagement = () => {
             fetchUsers();
         } catch (error) {
             console.error('Submit Error:', error);
-            alert(error.response?.data?.error || 'Operation failed');
+            closeSwal();
+            showError('Operation Failed', error.response?.data?.error || 'Failed to save user');
         }
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this user?')) {
+        const confirmed = await showConfirm(
+            'Delete User?',
+            'This action cannot be undone. Are you sure you want to delete this user?'
+        );
+
+        if (confirmed) {
+            showLoading('Deleting user...');
             try {
                 await api.delete(`/users/${userType}/${id}`);
-                // Optimistic update or refetch
+                await showSuccess('Deleted!', 'User has been deleted successfully');
                 fetchUsers();
             } catch (error) {
                 console.error('Error deleting user:', error);
-                alert('Failed to delete user');
+                closeSwal();
+                showError('Delete Failed', 'Failed to delete user');
             }
         }
     };
