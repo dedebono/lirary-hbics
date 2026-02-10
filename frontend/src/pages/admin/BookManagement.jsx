@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Book, Plus, Edit, Trash2, Search, Filter, Download } from 'lucide-react';
 import api from '../../utils/api';
+import { getImageUrl } from '../../utils/imageUrl';
 import BookCSVImport from '../../components/BookCSVImport';
 
 const BookManagement = () => {
@@ -325,7 +326,7 @@ const BookManagement = () => {
                                     <tr key={book.id} className="hover:bg-gray-50">
                                         <td className="px-4 py-3 text-sm">
                                             {book.book_cover ? (
-                                                <img src={`http://localhost:5000${book.book_cover}`} alt="Cover" className="w-10 h-14 object-cover rounded" />
+                                                <img src={getImageUrl(book.book_cover)} alt="Cover" className="w-10 h-14 object-cover rounded" />
                                             ) : (
                                                 <div className="w-10 h-14 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">No Img</div>
                                             )}
@@ -383,7 +384,7 @@ const BookManagement = () => {
                                         {(selectedCover || (editingBook && editingBook.book_cover)) && (
                                             <div className="w-20 h-28 bg-gray-100 rounded border shrink-0">
                                                 <img
-                                                    src={selectedCover ? URL.createObjectURL(selectedCover) : `http://localhost:5000${editingBook.book_cover}`}
+                                                    src={selectedCover ? URL.createObjectURL(selectedCover) : getImageUrl(editingBook.book_cover)}
                                                     alt="Preview"
                                                     className="w-full h-full object-cover rounded"
                                                 />

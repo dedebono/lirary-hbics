@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Plus, Edit, Trash2, Search, Filter, Download } from 'lucide-react';
 import api from '../../utils/api';
+import { getImageUrl } from '../../utils/imageUrl';
 import CSVImport from '../../components/CSVImport';
 
 const UserManagement = () => {
@@ -341,7 +342,7 @@ const UserManagement = () => {
                                         {userType !== 'admin' && (
                                             <td className="px-6 py-4 text-sm">
                                                 {user.photo ? (
-                                                    <img src={`http://localhost:5000${user.photo}`} alt="User" className="w-10 h-10 object-cover rounded-full" />
+                                                    <img src={getImageUrl(user.photo)} alt="User" className="w-10 h-10 object-cover rounded-full" />
                                                 ) : (
                                                     <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-400">
                                                         <Users className="w-6 h-6" />
