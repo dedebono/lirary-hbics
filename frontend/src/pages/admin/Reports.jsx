@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Users, BookOpen, TrendingUp, Calendar } from 'lucide-react';
 import api from '../../utils/api';
+import { formatDate } from '../../utils/dateUtils';
 
 const Reports = () => {
     const [stats, setStats] = useState({
@@ -149,17 +150,17 @@ const Reports = () => {
                                                     <div className="text-xs text-gray-500 capitalize">{borrow.user_type}</div>
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-600">
-                                                    {new Date(borrow.borrow_date).toLocaleDateString()}
+                                                    {formatDate(borrow.borrow_date)}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-600">
-                                                    {borrow.return_date ? new Date(borrow.return_date).toLocaleDateString() : (
-                                                        <span className="text-gray-400 italic">Expected: {new Date(borrow.due_date).toLocaleDateString()}</span>
+                                                    {borrow.return_date ? formatDate(borrow.return_date) : (
+                                                        <span className="text-gray-400 italic">Expected: {formatDate(borrow.due_date)}</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm">
                                                     <span className={`px-2 py-1 text-xs rounded-full font-medium ${borrow.status === 'Borrowed'
-                                                            ? 'bg-blue-100 text-blue-800'
-                                                            : 'bg-green-100 text-green-800'
+                                                        ? 'bg-blue-100 text-blue-800'
+                                                        : 'bg-green-100 text-green-800'
                                                         }`}>
                                                         {borrow.status}
                                                     </span>
@@ -192,7 +193,7 @@ const Reports = () => {
                                                 <td className="px-4 py-3 text-sm text-gray-900">{book.book_name}</td>
                                                 <td className="px-4 py-3 text-sm text-gray-600">{book.user_name}</td>
                                                 <td className="px-4 py-3 text-sm text-gray-600">
-                                                    {new Date(book.due_date).toLocaleDateString()}
+                                                    {formatDate(book.due_date)}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm">
                                                     <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">

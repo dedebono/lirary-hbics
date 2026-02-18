@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, BookOpen, Book, Clock, CheckCircle, XCircle } from 'lucide-react';
 import api from '../utils/api';
+import { formatDate } from '../utils/dateUtils';
+import DigitalClock from '../components/DigitalClock';
 
 const StudentDashboard = () => {
     const { user, logout } = useAuth();
@@ -139,7 +141,7 @@ const StudentDashboard = () => {
                                                 <div className="text-right">
                                                     <p className="text-sm text-gray-600">
                                                         <Clock className="w-4 h-4 inline mr-1" />
-                                                        Due: {new Date(loan.due_date).toLocaleDateString()}
+                                                        Due: {formatDate(loan.due_date)}
                                                     </p>
                                                 </div>
                                             </div>
@@ -161,6 +163,7 @@ const StudentDashboard = () => {
                     </>
                 )}
             </div>
+            <DigitalClock />
         </div>
     );
 };

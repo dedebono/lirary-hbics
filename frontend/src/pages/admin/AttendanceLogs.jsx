@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Filter, Download, Search, Clock } from 'lucide-react';
 import api from '../../utils/api';
+import { formatDate, ensureUtc } from '../../utils/dateUtils';
 
 const AttendanceLogs = () => {
     const [logs, setLogs] = useState([]);
@@ -105,10 +106,10 @@ const AttendanceLogs = () => {
     const exportToCSV = () => {
         const headers = ['Date', 'Time', 'Name', 'User Type', 'Barcode', 'Action'];
         const rows = filteredLogs.map(log => {
-            const date = new Date(log.timestamp);
+            const date = new Date(ensureUtc(log.timestamp));
             return [
-                date.toLocaleDateString(),
-                date.toLocaleTimeString(),
+                formatDate(date),
+                date.toLocaleTimeString('en-GB', { timeZone: 'Asia/Makassar' }),
                 log.user_name,
                 log.user_type,
                 log.barcode,
@@ -131,10 +132,15 @@ const AttendanceLogs = () => {
     };
 
     const formatDateTime = (timestamp) => {
-        const date = new Date(timestamp);
+        const date = new Date(ensureUtc(timestamp));
         return {
-            date: date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-            time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+            date: formatDate(date),
+            time: date.toLocaleTimeString('en-GB', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZone: 'Asia/Makassar'
+            })
         };
     };
 

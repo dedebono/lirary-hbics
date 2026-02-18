@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Filter, AlertCircle, CheckCircle, BookOpen, Calendar, Scan, User } from 'lucide-react';
 import api from '../../utils/api';
+import { formatDate } from '../../utils/dateUtils';
 
 const BorrowLogs = () => {
     const [borrowLogs, setBorrowLogs] = useState([]);
@@ -209,10 +210,10 @@ const BorrowLogs = () => {
                                                 <div className="flex flex-col gap-1">
                                                     <div className={`flex items-center gap-1.5 font-medium ${isOverdue ? 'text-red-600' : 'text-gray-700'}`}>
                                                         <Calendar className="w-3.5 h-3.5" />
-                                                        {new Date(log.due_date).toLocaleDateString()}
+                                                        {formatDate(log.due_date)}
                                                     </div>
                                                     <div className="text-xs text-gray-400">
-                                                        Borrowed: {new Date(log.borrow_date).toLocaleDateString()}
+                                                        Borrowed: {formatDate(log.borrow_date)}
                                                     </div>
                                                 </div>
                                             </td>

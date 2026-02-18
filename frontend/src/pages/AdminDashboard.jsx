@@ -10,6 +10,7 @@ import AttendanceScanner from '../components/AttendanceScanner';
 import AttendanceLogs from './admin/AttendanceLogs';
 import BorrowBook from './admin/BorrowBook';
 import BorrowLogs from './admin/BorrowLogs';
+import DigitalClock from '../components/DigitalClock';
 
 const AdminDashboard = () => {
     const { user, logout } = useAuth();
@@ -208,6 +209,7 @@ const AdminDashboard = () => {
                     </Routes>
                 </main>
             </div>
+            <DigitalClock />
         </div>
     );
 };
