@@ -46,6 +46,11 @@ app.use('/api/borrow', borrowRoutes);
 app.use('/api/ebooks', ebooksRoutes);
 app.use('/api/import', importRoutes);
 
+// Root API route
+app.get('/api', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', message: 'Library Management System API is running' });
