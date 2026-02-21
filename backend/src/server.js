@@ -46,7 +46,15 @@ app.use('/api/borrow', borrowRoutes);
 app.use('/api/ebooks', ebooksRoutes);
 app.use('/api/import', importRoutes);
 
-// Root API route
+// Root routes (with and without /api prefix)
+app.get('/', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
 app.get('/api', (req, res) => {
     res.json({ status: 'ok' });
 });
