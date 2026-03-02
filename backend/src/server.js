@@ -29,7 +29,7 @@ const corsOrigins = process.env.CORS_ORIGIN
 
 console.log('🔒 CORS enabled for origins:', corsOrigins);
 
-app.use(cors({
+const corsOptions = {
     origin: (origin, callback) => {
         // Allow requests with no origin (e.g. mobile apps, curl, Postman)
         if (!origin) return callback(null, true);
@@ -39,8 +39,14 @@ app.use(cors({
         }
         callback(new Error(`CORS: origin '${origin}' not allowed`));
     },
-    credentials: true
-}));
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
+};
+
+// Explicitly handle preflight OPTIONS for all routes (required for Cloudflare Tunnel)
+app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
