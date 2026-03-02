@@ -40,8 +40,10 @@ router.get('/', authenticateToken, requireAdmin, (req, res) => {
     if (!userType || userType === 'admin') {
         const isSuperAdmin = req.user.role === 'SuperAdmin';
         const sql = isSuperAdmin
+            // SuperAdmin sees all users including other SuperAdmins
             ? 'SELECT id, name, role, username, school_level, created_at FROM users'
-            : 'SELECT id, name, role, username, school_level, created_at FROM users WHERE school_level = ?';
+            // Regular Admin/Librarian: scoped to school, and never sees SuperAdmin accounts
+            : 'SELECT id, name, role, username, school_level, created_at FROM users WHERE school_level = ? AND role != \'SuperAdmin\'';
         const params = isSuperAdmin ? [] : [req.user.school_level];
         db.all(sql, params, (err, admins) => {
             if (err) return handleError(err);
@@ -84,7 +86,12 @@ router.get('/:userType/:id', authenticateToken, requireAdmin, (req, res) => {
     };
 
     if (userType === 'admin') {
-        db.get('SELECT id, name, role, username, created_at FROM users WHERE id = ? AND school_level = ?', [id, req.user.school_level], handleUserResult);
+        const isSuperAdmin = req.user.role === 'SuperAdmin';
+        const sql = isSuperAdmin
+            ? 'SELECT id, name, role, username, school_level, created_at FROM users WHERE id = ?'
+            : 'SELECT id, name, role, username, school_level, created_at FROM users WHERE id = ? AND school_level = ? AND role != \'SuperAdmin\'';
+        const params = isSuperAdmin ? [id] : [id, req.user.school_level];
+        db.get(sql, params, handleUserResult);
     } else if (userType === 'student') {
         db.get('SELECT id, name, class, barcode, photo, created_at FROM students WHERE id = ? AND school_level = ?', [id, req.user.school_level], handleUserResult);
     } else if (userType === 'teacher') {
@@ -117,8 +124,17 @@ router.put('/:userType/:id', authenticateToken, requireAdmin, upload.single('pho
 
     if (userType === 'admin') {
         const { name, role, username } = req.body;
-        // Admins don't have photo column in this migration
-        db.run('UPDATE users SET name = ?, role = ?, username = ? WHERE id = ?', [name, role, username, id], handleUpdateResult);
+        // Block regular admins from modifying a SuperAdmin account
+        if (req.user.role !== 'SuperAdmin') {
+            db.get('SELECT role FROM users WHERE id = ?', [id], (err, target) => {
+                if (err) return res.status(500).json({ error: 'Internal server error' });
+                if (!target) return res.status(404).json({ error: 'User not found' });
+                if (target.role === 'SuperAdmin') return res.status(403).json({ error: 'Cannot modify a SuperAdmin account' });
+                db.run('UPDATE users SET name = ?, role = ?, username = ? WHERE id = ?', [name, role, username, id], handleUpdateResult);
+            });
+        } else {
+            db.run('UPDATE users SET name = ?, role = ?, username = ? WHERE id = ?', [name, role, username, id], handleUpdateResult);
+        }
     } else if (userType === 'student') {
         const { name, class: className, barcode } = req.body; // Multer parses body but 'class' might be mapped from 'className' in frontend or kept as 'class'. Frontend sends 'class'. 
         // Wait, frontend usually sends JSON. When using FormData, keys are strings. 
@@ -174,7 +190,17 @@ router.delete('/:userType/:id', authenticateToken, requireAdmin, (req, res) => {
     };
 
     if (userType === 'admin') {
-        db.run('DELETE FROM users WHERE id = ?', [id], handleDeleteResult);
+        // Block regular admins from deleting a SuperAdmin account
+        if (req.user.role !== 'SuperAdmin') {
+            db.get('SELECT role FROM users WHERE id = ?', [id], (err, target) => {
+                if (err) return res.status(500).json({ error: 'Internal server error' });
+                if (!target) return res.status(404).json({ error: 'User not found' });
+                if (target.role === 'SuperAdmin') return res.status(403).json({ error: 'Cannot delete a SuperAdmin account' });
+                db.run('DELETE FROM users WHERE id = ?', [id], handleDeleteResult);
+            });
+        } else {
+            db.run('DELETE FROM users WHERE id = ?', [id], handleDeleteResult);
+        }
     } else if (userType === 'student') {
         db.run('DELETE FROM students WHERE id = ?', [id], handleDeleteResult);
     } else if (userType === 'teacher') {
