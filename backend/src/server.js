@@ -30,7 +30,15 @@ const corsOrigins = process.env.CORS_ORIGIN
 console.log('🔒 CORS enabled for origins:', corsOrigins);
 
 app.use(cors({
-    origin: corsOrigins,
+    origin: (origin, callback) => {
+        // Allow requests with no origin (e.g. mobile apps, curl, Postman)
+        if (!origin) return callback(null, true);
+        // Allow any *.ytcb.org subdomain as a safety net
+        if (origin.endsWith('.ytcb.org') || corsOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        callback(new Error(`CORS: origin '${origin}' not allowed`));
+    },
     credentials: true
 }));
 app.use(express.json());
