@@ -44,6 +44,29 @@ const corsOptions = {
     allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
 };
 
+// Diagnostic: log every request so we can see if OPTIONS reaches Node.js
+app.use((req, res, next) => {
+    if (req.method === 'OPTIONS') {
+        console.log(`✈️  Preflight OPTIONS received from origin: ${req.headers.origin} → ${req.path}`);
+    }
+    next();
+});
+
+// Hard-inject CORS headers as a safety net for Cloudflare Tunnel edge interception
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && (origin.endsWith('.ytcb.org') || corsOrigins.includes(origin))) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type,Accept');
+    }
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+    }
+    next();
+});
+
 // Explicitly handle preflight OPTIONS for all routes (required for Cloudflare Tunnel)
 app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
