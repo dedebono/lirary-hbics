@@ -93,15 +93,22 @@ router.post('/register', authenticateToken, upload.single('photo'), [
     if (req.user.role !== 'Admin' && req.user.role !== 'Librarian' && req.user.role !== 'SuperAdmin') {
         return res.status(403).json({ error: 'Admin access required' });
     }
+    // Only SuperAdmin can create other admin accounts
+    if (req.body.userType === 'admin' && req.user.role !== 'SuperAdmin') {
+        return res.status(403).json({ error: 'Only SuperAdmin can create admin accounts' });
+    }
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, userType, password, username, barcode, className, role } = req.body;
+    const { name, userType, password, username, barcode, className, role, school_level: submittedSchoolLevel } = req.body;
     const photo = req.file ? `/uploads/photos/${req.file.filename}` : null;
-    const school_level = req.user.school_level; // Inherit from logged-in admin
+    // SuperAdmin can submit explicit school_level; others inherit from their own account
+    const school_level = (req.user.role === 'SuperAdmin' && submittedSchoolLevel)
+        ? submittedSchoolLevel
+        : req.user.school_level;
 
     try {
         const passwordHash = await bcrypt.hash(password, 10);
@@ -109,6 +116,9 @@ router.post('/register', authenticateToken, upload.single('photo'), [
         if (userType === 'admin') {
             if (!username) {
                 return res.status(400).json({ error: 'Username is required for admin users' });
+            }
+            if (!school_level) {
+                return res.status(400).json({ error: 'Area (school level) is required for admin users' });
             }
 
             const result = await dbRun(

@@ -123,18 +123,12 @@ router.put('/:userType/:id', authenticateToken, requireAdmin, upload.single('pho
     };
 
     if (userType === 'admin') {
-        const { name, role, username } = req.body;
-        // Block regular admins from modifying a SuperAdmin account
+        // Only SuperAdmin can modify admin accounts
         if (req.user.role !== 'SuperAdmin') {
-            db.get('SELECT role FROM users WHERE id = ?', [id], (err, target) => {
-                if (err) return res.status(500).json({ error: 'Internal server error' });
-                if (!target) return res.status(404).json({ error: 'User not found' });
-                if (target.role === 'SuperAdmin') return res.status(403).json({ error: 'Cannot modify a SuperAdmin account' });
-                db.run('UPDATE users SET name = ?, role = ?, username = ? WHERE id = ?', [name, role, username, id], handleUpdateResult);
-            });
-        } else {
-            db.run('UPDATE users SET name = ?, role = ?, username = ? WHERE id = ?', [name, role, username, id], handleUpdateResult);
+            return res.status(403).json({ error: 'Only SuperAdmin can modify admin accounts' });
         }
+        const { name, role, username } = req.body;
+        db.run('UPDATE users SET name = ?, role = ?, username = ? WHERE id = ?', [name, role, username, id], handleUpdateResult);
     } else if (userType === 'student') {
         const { name, class: className, barcode } = req.body; // Multer parses body but 'class' might be mapped from 'className' in frontend or kept as 'class'. Frontend sends 'class'. 
         // Wait, frontend usually sends JSON. When using FormData, keys are strings. 
@@ -190,17 +184,11 @@ router.delete('/:userType/:id', authenticateToken, requireAdmin, (req, res) => {
     };
 
     if (userType === 'admin') {
-        // Block regular admins from deleting a SuperAdmin account
+        // Only SuperAdmin can delete admin accounts
         if (req.user.role !== 'SuperAdmin') {
-            db.get('SELECT role FROM users WHERE id = ?', [id], (err, target) => {
-                if (err) return res.status(500).json({ error: 'Internal server error' });
-                if (!target) return res.status(404).json({ error: 'User not found' });
-                if (target.role === 'SuperAdmin') return res.status(403).json({ error: 'Cannot delete a SuperAdmin account' });
-                db.run('DELETE FROM users WHERE id = ?', [id], handleDeleteResult);
-            });
-        } else {
-            db.run('DELETE FROM users WHERE id = ?', [id], handleDeleteResult);
+            return res.status(403).json({ error: 'Only SuperAdmin can delete admin accounts' });
         }
+        db.run('DELETE FROM users WHERE id = ?', [id], handleDeleteResult);
     } else if (userType === 'student') {
         db.run('DELETE FROM students WHERE id = ?', [id], handleDeleteResult);
     } else if (userType === 'teacher') {

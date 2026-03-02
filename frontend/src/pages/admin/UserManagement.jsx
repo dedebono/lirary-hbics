@@ -4,8 +4,11 @@ import api from '../../utils/api';
 import { getImageUrl } from '../../utils/imageUrl';
 import { showLoading, showSuccess, showError, showConfirm, closeSwal } from '../../utils/notifications';
 import CSVImport from '../../components/CSVImport';
+import { useAuth } from '../../context/AuthContext';
 
 const UserManagement = () => {
+    const { user: currentUser } = useAuth();
+    const isSuperAdmin = currentUser?.role === 'SuperAdmin';
     const [users, setUsers] = useState([]);
     const [filteredUsers, setFilteredUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -21,7 +24,8 @@ const UserManagement = () => {
         username: '',
         password: '',
         className: '',
-        role: 'Admin'
+        role: 'Admin',
+        school_level: 'Primary'
     });
 
     useEffect(() => {
@@ -87,6 +91,7 @@ const UserManagement = () => {
             if (userType === 'admin') {
                 data.append('username', formData.username);
                 data.append('role', formData.role);
+                data.append('school_level', formData.school_level);
             } else if (userType === 'student') {
                 data.append('barcode', formData.barcode);
                 data.append('className', formData.className);
@@ -179,8 +184,9 @@ const UserManagement = () => {
             barcode: user.barcode || '',
             username: user.username || '',
             password: '',
-            className: user.class || '', // Note: 'class' from DB is mapped to 'className' in form
-            role: user.role || 'Admin'
+            className: user.class || '',
+            role: user.role || 'Admin',
+            school_level: user.school_level || 'Primary'
         });
         setSelectedPhoto(null);
         setShowAddModal(true);
@@ -193,7 +199,8 @@ const UserManagement = () => {
             username: '',
             password: '',
             className: '',
-            role: 'Admin'
+            role: 'Admin',
+            school_level: 'Primary'
         });
         setSelectedPhoto(null);
     };
@@ -251,13 +258,16 @@ const UserManagement = () => {
                         Export CSV
                     </button>
                     <CSVImport userType={userType} onImportComplete={fetchUsers} />
-                    <button
-                        onClick={() => { setShowAddModal(true); setEditingUser(null); resetForm(); }}
-                        className="btn-primary flex items-center gap-2"
-                    >
-                        <Plus className="w-5 h-5" />
-                        Add User
-                    </button>
+                    {/* Only SuperAdmin can add admin accounts; others can add students/teachers */}
+                    {(userType !== 'admin' || isSuperAdmin) && (
+                        <button
+                            onClick={() => { setShowAddModal(true); setEditingUser(null); resetForm(); }}
+                            className="btn-primary flex items-center gap-2"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Add User
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -377,6 +387,7 @@ const UserManagement = () => {
                                         <>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Area</th>
                                         </>
                                     )}
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -411,33 +422,50 @@ const UserManagement = () => {
                                                         {user.role}
                                                     </span>
                                                 </td>
+                                                <td className="px-6 py-4 text-sm">
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${user.school_level === 'Primary'
+                                                        ? 'bg-blue-100 text-blue-800'
+                                                        : 'bg-green-100 text-green-800'
+                                                        }`}>
+                                                        {user.school_level || '-'}
+                                                    </span>
+                                                </td>
                                             </>
                                         )}
                                         <td className="px-6 py-4 text-sm">
                                             <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => handleEdit(user)}
-                                                    className="text-blue-600 hover:text-blue-800"
-                                                    title="Edit user"
-                                                >
-                                                    <Edit className="w-4 h-4" />
-                                                </button>
-                                                {userType === 'admin' && (
+                                                {/* Edit: SuperAdmin for admins; anyone for student/teacher */}
+                                                {(userType !== 'admin' || isSuperAdmin) && (
                                                     <button
-                                                        onClick={() => handleResetPassword(user)}
-                                                        className="text-amber-500 hover:text-amber-700"
-                                                        title="Reset password"
+                                                        onClick={() => handleEdit(user)}
+                                                        className="text-blue-600 hover:text-blue-800"
+                                                        title="Edit user"
                                                     >
-                                                        <KeyRound className="w-4 h-4" />
+                                                        <Edit className="w-4 h-4" />
                                                     </button>
                                                 )}
-                                                <button
-                                                    onClick={() => handleDelete(user.id)}
-                                                    className="text-red-600 hover:text-red-800"
-                                                    title="Delete user"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                                {/* Reset Password: SuperAdmin sees all; regular admin sees only their own */}
+                                                {userType === 'admin' && (
+                                                    (isSuperAdmin || user.id === currentUser?.id) && (
+                                                        <button
+                                                            onClick={() => handleResetPassword(user)}
+                                                            className="text-amber-500 hover:text-amber-700"
+                                                            title="Reset password"
+                                                        >
+                                                            <KeyRound className="w-4 h-4" />
+                                                        </button>
+                                                    )
+                                                )}
+                                                {/* Delete: SuperAdmin for admins; anyone for student/teacher */}
+                                                {(userType !== 'admin' || isSuperAdmin) && (
+                                                    <button
+                                                        onClick={() => handleDelete(user.id)}
+                                                        className="text-red-600 hover:text-red-800"
+                                                        title="Delete user"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -539,8 +567,29 @@ const UserManagement = () => {
                                             required
                                         >
                                             <option value="Admin">Admin</option>
-                                            <option value="Super Admin">Super Admin</option>
+                                            <option value="Librarian">Librarian</option>
                                         </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Area *</label>
+                                        {isSuperAdmin ? (
+                                            <select
+                                                value={formData.school_level}
+                                                onChange={(e) => setFormData({ ...formData, school_level: e.target.value })}
+                                                className="input-field"
+                                                required
+                                            >
+                                                <option value="Primary">Primary</option>
+                                                <option value="Secondary">Secondary</option>
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={formData.school_level || currentUser?.school_level || ''}
+                                                className="input-field bg-gray-100 cursor-not-allowed"
+                                                readOnly
+                                            />
+                                        )}
                                     </div>
                                 </>
                             )}
