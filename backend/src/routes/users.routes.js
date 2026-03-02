@@ -1,4 +1,5 @@
 import express from 'express';
+import bcrypt from 'bcryptjs';
 import { body, validationResult } from 'express-validator';
 import getDb from '../database/db.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
@@ -37,7 +38,12 @@ router.get('/', authenticateToken, requireAdmin, (req, res) => {
     if (expectedQueries === 0) return res.json({ users: [] });
 
     if (!userType || userType === 'admin') {
-        db.all('SELECT id, name, role, username, created_at FROM users WHERE school_level = ?', [req.user.school_level], (err, admins) => {
+        const isSuperAdmin = req.user.role === 'SuperAdmin';
+        const sql = isSuperAdmin
+            ? 'SELECT id, name, role, username, school_level, created_at FROM users'
+            : 'SELECT id, name, role, username, school_level, created_at FROM users WHERE school_level = ?';
+        const params = isSuperAdmin ? [] : [req.user.school_level];
+        db.all(sql, params, (err, admins) => {
             if (err) return handleError(err);
             users = users.concat((admins || []).map(u => ({ ...u, userType: 'admin' })));
             checkCompletion();
@@ -175,6 +181,44 @@ router.delete('/:userType/:id', authenticateToken, requireAdmin, (req, res) => {
         db.run('DELETE FROM teachers WHERE id = ?', [id], handleDeleteResult);
     } else {
         res.status(400).json({ error: 'Invalid user type' });
+    }
+});
+
+// Reset password for any admin user (SuperAdmin only, or Admin for same school)
+router.patch('/admin/:id/reset-password', authenticateToken, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+    const db = getDb();
+
+    if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    try {
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+
+        // SuperAdmin can reset any admin; regular Admin can only reset within their school
+        const isSuperAdmin = req.user.role === 'SuperAdmin';
+        const sql = isSuperAdmin
+            ? 'UPDATE users SET password_hash = ? WHERE id = ?'
+            : 'UPDATE users SET password_hash = ? WHERE id = ? AND school_level = ?';
+        const params = isSuperAdmin
+            ? [passwordHash, id]
+            : [passwordHash, id, req.user.school_level];
+
+        db.run(sql, params, function (err) {
+            if (err) {
+                console.error('Error resetting password:', err);
+                return res.status(500).json({ error: 'Internal server error' });
+            }
+            if (this.changes === 0) {
+                return res.status(404).json({ error: 'Admin user not found' });
+            }
+            res.json({ message: 'Password reset successfully' });
+        });
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 

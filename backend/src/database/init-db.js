@@ -50,7 +50,7 @@ const createTables = async () => {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
-      role TEXT NOT NULL CHECK(role IN ('Admin', 'Librarian')),
+      role TEXT NOT NULL CHECK(role IN ('Admin', 'Librarian', 'SuperAdmin')),
       school_level TEXT NOT NULL CHECK(school_level IN ('Primary', 'Secondary')),
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,

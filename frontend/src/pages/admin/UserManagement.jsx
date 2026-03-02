@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Edit, Trash2, Search, Filter, Download } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Search, Filter, Download, KeyRound } from 'lucide-react';
 import api from '../../utils/api';
 import { getImageUrl } from '../../utils/imageUrl';
 import { showLoading, showSuccess, showError, showConfirm, closeSwal } from '../../utils/notifications';
@@ -118,6 +118,37 @@ const UserManagement = () => {
             console.error('Submit Error:', error);
             closeSwal();
             showError('Operation Failed', error.response?.data?.error || 'Failed to save user');
+        }
+    };
+
+    const handleResetPassword = async (user) => {
+        const { value: newPassword } = await import('sweetalert2').then(({ default: Swal }) =>
+            Swal.fire({
+                title: `Reset Password`,
+                html: `<p style="margin-bottom:8px;color:#555">Set a new password for <strong>${user.name}</strong> (<code>${user.username}</code>)</p>`,
+                input: 'password',
+                inputLabel: 'New Password',
+                inputPlaceholder: 'Enter new password (min. 6 characters)',
+                inputAttributes: { minlength: 6, autocomplete: 'new-password' },
+                showCancelButton: true,
+                confirmButtonText: 'Reset Password',
+                confirmButtonColor: '#2563eb',
+                inputValidator: (value) => {
+                    if (!value) return 'Please enter a new password';
+                    if (value.length < 6) return 'Password must be at least 6 characters';
+                }
+            })
+        );
+
+        if (!newPassword) return;
+
+        showLoading('Resetting password...');
+        try {
+            await api.patch(`/users/admin/${user.id}/reset-password`, { newPassword });
+            await showSuccess('Password Reset!', `Password for ${user.name} has been reset successfully.`);
+        } catch (error) {
+            closeSwal();
+            showError('Reset Failed', error.response?.data?.error || 'Failed to reset password');
         }
     };
 
@@ -387,12 +418,23 @@ const UserManagement = () => {
                                                 <button
                                                     onClick={() => handleEdit(user)}
                                                     className="text-blue-600 hover:text-blue-800"
+                                                    title="Edit user"
                                                 >
                                                     <Edit className="w-4 h-4" />
                                                 </button>
+                                                {userType === 'admin' && (
+                                                    <button
+                                                        onClick={() => handleResetPassword(user)}
+                                                        className="text-amber-500 hover:text-amber-700"
+                                                        title="Reset password"
+                                                    >
+                                                        <KeyRound className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => handleDelete(user.id)}
                                                     className="text-red-600 hover:text-red-800"
+                                                    title="Delete user"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>

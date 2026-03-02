@@ -20,10 +20,10 @@ const PrivateRoute = ({ children, requiredRole }) => {
     if (requiredRole) {
         const hasAccess = () => {
             if (requiredRole === 'admin') {
-                return user.role === 'Admin' || user.role === 'Librarian';
+                return user.role === 'Admin' || user.role === 'Librarian' || user.role === 'SuperAdmin';
             }
             if (requiredRole === 'teacher') {
-                return user.role === 'Teacher' || user.role === 'Admin' || user.role === 'Librarian';
+                return user.role === 'Teacher' || user.role === 'Admin' || user.role === 'Librarian' || user.role === 'SuperAdmin';
             }
             return true;
         };

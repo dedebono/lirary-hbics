@@ -90,7 +90,7 @@ router.post('/register', authenticateToken, upload.single('photo'), [
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
 ], async (req, res) => {
     // Check if user is admin
-    if (req.user.role !== 'Admin' && req.user.role !== 'Librarian') {
+    if (req.user.role !== 'Admin' && req.user.role !== 'Librarian' && req.user.role !== 'SuperAdmin') {
         return res.status(403).json({ error: 'Admin access required' });
     }
 

@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const isAdmin = () => {
-        return user?.role === 'Admin' || user?.role === 'Librarian';
+        return user?.role === 'Admin' || user?.role === 'Librarian' || user?.role === 'SuperAdmin';
     };
 
     const isTeacher = () => {

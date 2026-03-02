@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, BookOpen, Book, Clock, CheckCircle, XCircle } from 'lucide-react';
 import api from '../utils/api';
@@ -7,9 +8,17 @@ import DigitalClock from '../components/DigitalClock';
 
 const StudentDashboard = () => {
     const { user, logout } = useAuth();
+    const navigate = useNavigate();
     const [myLoans, setMyLoans] = useState([]);
     const [attendanceStatus, setAttendanceStatus] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // Redirect Admin / SuperAdmin away from student dashboard
+    useEffect(() => {
+        if (user && (user.role === 'Admin' || user.role === 'Librarian' || user.role === 'SuperAdmin')) {
+            navigate('/admin', { replace: true });
+        }
+    }, [user]);
 
     useEffect(() => {
         fetchData();

@@ -13,7 +13,7 @@ const AppRoutes = () => {
 
     const getDefaultRoute = () => {
         if (!user) return '/login';
-        if (user.role === 'Admin' || user.role === 'Librarian') return '/admin';
+        if (user.role === 'Admin' || user.role === 'Librarian' || user.role === 'SuperAdmin') return '/admin';
         if (user.role === 'Teacher') return '/teacher';
         return '/student';
     };
