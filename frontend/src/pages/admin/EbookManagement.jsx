@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Upload, Trash2, FileText, X, CheckCircle } from 'lucide-react';
+import { BookOpen, Upload, Trash2, FileText, X, CheckCircle, RefreshCcw } from 'lucide-react';
 import api from '../../utils/api';
 import { getBackendUrl } from '../../utils/imageUrl';
 
@@ -10,6 +10,7 @@ const EbookManagement = () => {
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [notification, setNotification] = useState(null);
+    const [backfilling, setBackfilling] = useState(false);
 
     // Form state
     const [title, setTitle] = useState('');
@@ -119,6 +120,20 @@ const EbookManagement = () => {
         }
     };
 
+    const handleBackfill = async () => {
+        setBackfilling(true);
+        try {
+            const res = await api.post('/ebooks/backfill-thumbnails');
+            showNotification(res.data.message);
+            // Thumbnails generate in background, refresh list after 5s to show results
+            setTimeout(() => fetchData(), 5000);
+        } catch (error) {
+            showNotification(error.response?.data?.error || 'Backfill failed', 'error');
+        } finally {
+            setBackfilling(false);
+        }
+    };
+
     const formatClasses = (allowedClasses) => {
         if (!allowedClasses) return 'All Classes';
         try {
@@ -141,10 +156,20 @@ const EbookManagement = () => {
                 </div>
             )}
 
-            <h1 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <BookOpen className="w-7 h-7 text-primary-600" />
-                E-Book Management
-            </h1>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    <BookOpen className="w-7 h-7 text-primary-600" />
+                    E-Book Management
+                </h1>
+                <button
+                    onClick={handleBackfill}
+                    disabled={backfilling}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                    <RefreshCcw className={`w-4 h-4 ${backfilling ? 'animate-spin' : ''}`} />
+                    {backfilling ? 'Starting...' : 'Generate Missing Thumbnails'}
+                </button>
+            </div>
 
             {/* Upload Form */}
             <div className="card mb-8">

@@ -154,6 +154,28 @@ const canAccessEbook = (ebook, userClass) => {
     }
 };
 
+// Admin trigger to backfill all missing thumbnails manually
+router.post('/backfill-thumbnails', authenticateToken, requireAdmin, (req, res) => {
+    const db = getDb();
+    db.all('SELECT id, file_path FROM ebooks WHERE thumbnail_path IS NULL', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!rows || rows.length === 0) {
+            return res.json({ message: 'All ebooks already have thumbnails.' });
+        }
+
+        // Run in background so we don't timeout the request
+        res.json({ message: `Started thumbnail generation for ${rows.length} ebook(s) in the background.` });
+
+        const uploadsDir = path.join(__dirname, '..', '..', 'uploads', 'ebooks');
+        rows.forEach(row => {
+            const fullPath = path.join(uploadsDir, row.file_path);
+            if (fs.existsSync(fullPath)) {
+                generateThumbnailAsync(fullPath, row.id).catch(e => console.error('[backfill async] error:', e));
+            }
+        });
+    });
+});
+
 // Get all e-books (filtered by school + class for students)
 router.get('/', authenticateToken, (req, res) => {
     const { category, search } = req.query;
