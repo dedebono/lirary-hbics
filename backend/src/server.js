@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
 import authRoutes from './routes/auth.routes.js';
 import booksRoutes from './routes/books.routes.js';
 import usersRoutes from './routes/users.routes.js';
@@ -13,6 +16,8 @@ import getDb from './database/db.js';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+const execFileAsync = promisify(execFile);
 
 dotenv.config();
 
@@ -136,7 +141,7 @@ app.use((req, res) => {
     res.status(404).json({ error: 'Route not found' });
 });
 
-// Migrate ebooks table: add school_level + allowed_classes if not present
+// Migrate ebooks table: add school_level + allowed_classes + thumbnail_path if not present
 const runEbookMigrations = () => {
     const db = getDb();
     db.run(`ALTER TABLE ebooks ADD COLUMN school_level TEXT`, (err) => {
@@ -158,6 +163,51 @@ const runEbookMigrations = () => {
             console.error('Migration error (thumbnail_path):', err.message);
         } else if (!err) {
             console.log('✅ ebooks.thumbnail_path column added');
+        }
+        // After column exists, backfill thumbnails for existing ebooks
+        backfillEbookThumbnails();
+    });
+};
+
+/**
+ * Generate thumbnails for all existing ebooks that have no thumbnail yet.
+ * Runs quietly on server startup — only does work if gs is available.
+ */
+const backfillEbookThumbnails = async () => {
+    const db = getDb();
+    db.all('SELECT id, file_path FROM ebooks WHERE thumbnail_path IS NULL', [], async (err, rows) => {
+        if (err || !rows || rows.length === 0) return;
+        console.log(`[ebook thumb] Backfilling ${rows.length} ebook(s)…`);
+
+        const uploadsDir = path.join(__dirname, '..', 'uploads', 'ebooks');
+        const thumbDir = path.join(uploadsDir, 'thumbs');
+        if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
+
+        for (const row of rows) {
+            const filePath = path.join(uploadsDir, row.file_path);
+            if (!fs.existsSync(filePath)) continue;
+
+            const baseName = path.basename(filePath, path.extname(filePath));
+            const thumbFilename = `${baseName}.jpg`;
+            const thumbPath = path.join(thumbDir, thumbFilename);
+
+            try {
+                await execFileAsync('gs', [
+                    '-sDEVICE=jpeg', '-dNOPAUSE', '-dBATCH', '-dQUIET',
+                    '-dFirstPage=1', '-dLastPage=1',
+                    '-r96', '-dDEVICEWIDTHPOINTS=400', '-dPDFFitPage',
+                    `-sOutputFile=${thumbPath}`,
+                    filePath,
+                ]);
+                db.run('UPDATE ebooks SET thumbnail_path = ? WHERE id = ?',
+                    [`thumbs/${thumbFilename}`, row.id],
+                    (e) => { if (!e) console.log(`[ebook thumb] Backfilled id=${row.id}: ${thumbFilename}`); }
+                );
+            } catch {
+                // gs not available — stop trying
+                console.log('[ebook thumb] gs not available, skipping backfill');
+                break;
+            }
         }
     });
 };
