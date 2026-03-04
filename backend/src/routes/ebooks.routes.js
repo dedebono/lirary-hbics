@@ -2,17 +2,80 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { body, validationResult } from 'express-validator';
+import { PDFDocument } from 'pdf-lib';
 import getDb from '../database/db.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { requireAdmin } from '../middleware/role.middleware.js';
+
+const execFileAsync = promisify(execFile);
 
 const router = express.Router();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+/**
+ * Compress a PDF file in-place:
+ * 1. Try Ghostscript (gs) — best compression, pre-installed on most Linux servers
+ * 2. Fall back to pdf-lib — pure Node.js, removes redundancy/metadata
+ * Replaces the original file only if the output is smaller.
+ */
+const compressPdfAsync = async (filePath) => {
+    const tmpPath = filePath + '.tmp.pdf';
+    let usedGs = false;
+
+    try {
+        // Attempt Ghostscript compression (Linux/macOS production servers)
+        await execFileAsync('gs', [
+            '-sDEVICE=pdfwrite',
+            '-dCompatibilityLevel=1.4',
+            '-dPDFSETTINGS=/ebook',   // 150 dpi images — good balance
+            '-dNOPAUSE', '-dQUIET', '-dBATCH',
+            `-sOutputFile=${tmpPath}`,
+            filePath,
+        ]);
+        usedGs = true;
+    } catch {
+        // gs not available — use pdf-lib (removes metadata/unused objects)
+        try {
+            const bytes = fs.readFileSync(filePath);
+            const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+            pdfDoc.setTitle('');
+            pdfDoc.setAuthor('');
+            pdfDoc.setSubject('');
+            pdfDoc.setKeywords([]);
+            pdfDoc.setCreator('');
+            pdfDoc.setProducer('');
+            const compressed = await pdfDoc.save({ useObjectStreams: true, addDefaultPage: false });
+            fs.writeFileSync(tmpPath, compressed);
+        } catch (pdfLibErr) {
+            console.error('[ebook compress] pdf-lib fallback failed:', pdfLibErr.message);
+            return; // give up, keep original
+        }
+    }
+
+    // Only replace if the new file is actually smaller
+    try {
+        const origSize = fs.statSync(filePath).size;
+        const newSize = fs.statSync(tmpPath).size;
+        if (newSize < origSize) {
+            fs.renameSync(tmpPath, filePath);
+            const saved = ((1 - newSize / origSize) * 100).toFixed(1);
+            console.log(`[ebook compress] ${path.basename(filePath)}: ${(origSize / 1024).toFixed(0)}KB → ${(newSize / 1024).toFixed(0)}KB (-${saved}%) via ${usedGs ? 'gs' : 'pdf-lib'}`);
+        } else {
+            fs.unlinkSync(tmpPath);
+            console.log(`[ebook compress] No size reduction for ${path.basename(filePath)}, keeping original`);
+        }
+    } catch (err) {
+        console.error('[ebook compress] rename/cleanup error:', err.message);
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+    }
+};
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -155,10 +218,16 @@ router.post('/', authenticateToken, requireAdmin, upload.single('file'), [
             if (req.file) fs.unlinkSync(req.file.path);
             return res.status(500).json({ error: 'Internal server error' });
         }
+        // Respond immediately so the admin isn't waiting
         res.status(201).json({
             message: 'E-book uploaded successfully',
             ebookId: this.lastID
         });
+        // Compress in the background after responding
+        const fullPath = path.join(__dirname, '..', '..', 'uploads', 'ebooks', req.file.filename);
+        compressPdfAsync(fullPath).catch(err =>
+            console.error('[ebook compress] Unhandled error:', err.message)
+        );
     });
 });
 
