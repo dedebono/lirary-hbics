@@ -16,8 +16,7 @@ const StudentDashboard = () => {
     const [ebooks, setEbooks] = useState([]);
     const [ebooksLoading, setEbooksLoading] = useState(true);
     const [loading, setLoading] = useState(true);
-    const [openingId, setOpeningId] = useState(null);
-    // pdfModal: { url: string, title: string } | null
+    // pdfModal: { id, title } | null
     const [pdfModal, setPdfModal] = useState(null);
 
     // Redirect Admin / SuperAdmin away from student dashboard
@@ -76,22 +75,11 @@ const StudentDashboard = () => {
         }
     };
 
-    const handleReadEbook = async (ebook) => {
-        setOpeningId(ebook.id);
-        try {
-            const res = await api.get(`/ebooks/${ebook.id}/read`, { responseType: 'blob' });
-            const blob = new Blob([res.data], { type: 'application/pdf' });
-            const url = URL.createObjectURL(blob);
-            setPdfModal({ url, title: ebook.title });
-        } catch (error) {
-            alert(error.response?.data?.error || 'Could not open e-book');
-        } finally {
-            setOpeningId(null);
-        }
+    const handleReadEbook = (ebook) => {
+        setPdfModal({ id: ebook.id, title: ebook.title });
     };
 
     const closePdfModal = () => {
-        if (pdfModal?.url) URL.revokeObjectURL(pdfModal.url);
         setPdfModal(null);
     };
 
@@ -285,20 +273,10 @@ const StudentDashboard = () => {
                                                 )}
                                                 <button
                                                     onClick={() => handleReadEbook(eb)}
-                                                    disabled={openingId === eb.id}
-                                                    className="mt-auto btn-primary text-xs flex items-center justify-center gap-1.5 py-1.5 disabled:opacity-60"
+                                                    className="mt-auto btn-primary text-xs flex items-center justify-center gap-1.5 py-1.5"
                                                 >
-                                                    {openingId === eb.id ? (
-                                                        <>
-                                                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                            Opening…
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <BookOpen className="w-3 h-3" />
-                                                            Read
-                                                        </>
-                                                    )}
+                                                    <BookOpen className="w-3 h-3" />
+                                                    Read
                                                 </button>
                                             </div>
                                         </div>
@@ -315,7 +293,7 @@ const StudentDashboard = () => {
             {/* PDF Reader Modal */}
             {pdfModal && (
                 <PdfReader
-                    url={pdfModal.url}
+                    ebookId={pdfModal.id}
                     title={pdfModal.title}
                     onClose={closePdfModal}
                 />

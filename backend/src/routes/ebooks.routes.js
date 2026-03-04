@@ -192,11 +192,38 @@ router.get('/:id/read', authenticateToken, (req, res) => {
             if (err) console.error('Error logging e-book read:', err);
         });
 
+        res.setHeader('Accept-Ranges', 'bytes');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="${ebook.title}.pdf"`);
 
-        const fileStream = fs.createReadStream(filePath);
-        fileStream.pipe(res);
+        const stat = fs.statSync(filePath);
+        const fileSize = stat.size;
+        const rangeHeader = req.headers['range'];
+
+        if (rangeHeader) {
+            // Parse "bytes=start-end"
+            const [, rangeStr] = rangeHeader.match(/bytes=(\d*)-(\d*)/) || [];
+            const parts = rangeHeader.replace('bytes=', '').split('-');
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+            if (isNaN(start) || start >= fileSize || end >= fileSize) {
+                res.status(416).setHeader('Content-Range', `bytes */${fileSize}`);
+                return res.end();
+            }
+
+            const chunkSize = (end - start) + 1;
+            res.status(206);
+            res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+            res.setHeader('Content-Length', chunkSize);
+            const fileStream = fs.createReadStream(filePath, { start, end });
+            fileStream.pipe(res);
+        } else {
+            // Full file (first load / non-range request)
+            res.setHeader('Content-Length', fileSize);
+            const fileStream = fs.createReadStream(filePath);
+            fileStream.pipe(res);
+        }
     });
 });
 
