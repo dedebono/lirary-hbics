@@ -16,29 +16,48 @@ router.post('/checkin', authenticateToken, (req, res) => {
         return res.status(403).json({ error: 'Only students and teachers can check in' });
     }
 
-    // Check if already checked in
-    db.get('SELECT * FROM attendance_logs WHERE user_id = ? AND user_type = ? ORDER BY timestamp DESC LIMIT 1', [id, userType], (err, lastLog) => {
-        if (err) {
-            console.error('Check-in error (fetch):', err);
-            return res.status(500).json({ error: 'Internal server error' });
-        }
-
-        if (lastLog && lastLog.type === 'In') {
-            return res.status(400).json({ error: 'Already checked in' });
-        }
-
-        db.run('INSERT INTO attendance_logs (user_id, user_type, type) VALUES (?, ?, "In")', [id, userType], function (err) {
+    // Check if the user has already checked in today (same calendar day)
+    db.get(
+        `SELECT * FROM attendance_logs
+         WHERE user_id = ? AND user_type = ? AND type = 'In'
+           AND DATE(timestamp) = DATE('now', 'localtime')
+         LIMIT 1`,
+        [id, userType],
+        (err, todayCheckIn) => {
             if (err) {
-                console.error('Check-in error (insert):', err);
+                console.error('Check-in error (fetch today):', err);
                 return res.status(500).json({ error: 'Internal server error' });
             }
 
-            res.status(201).json({
-                message: 'Checked in successfully',
-                logId: this.lastID
+            if (todayCheckIn) {
+                return res.status(400).json({ error: 'You have already checked in today. Only one check-in is allowed per day.' });
+            }
+
+            // Also ensure they are not currently checked in (last log is not 'In')
+            db.get('SELECT * FROM attendance_logs WHERE user_id = ? AND user_type = ? ORDER BY timestamp DESC LIMIT 1', [id, userType], (err, lastLog) => {
+                if (err) {
+                    console.error('Check-in error (fetch last):', err);
+                    return res.status(500).json({ error: 'Internal server error' });
+                }
+
+                if (lastLog && lastLog.type === 'In') {
+                    return res.status(400).json({ error: 'Already checked in' });
+                }
+
+                db.run('INSERT INTO attendance_logs (user_id, user_type, type) VALUES (?, ?, "In")', [id, userType], function (err) {
+                    if (err) {
+                        console.error('Check-in error (insert):', err);
+                        return res.status(500).json({ error: 'Internal server error' });
+                    }
+
+                    res.status(201).json({
+                        message: 'Checked in successfully',
+                        logId: this.lastID
+                    });
+                });
             });
-        });
-    });
+        }
+    );
 });
 
 // Check-out (Student/Teacher)
@@ -87,10 +106,32 @@ router.get('/status', authenticateToken, (req, res) => {
             return res.status(500).json({ error: 'Internal server error' });
         }
 
-        res.json({
-            isCheckedIn: lastLog && lastLog.type === 'In',
-            lastLog: lastLog || null
-        });
+        // Check if the user already had a check-in today
+        db.get(
+            `SELECT * FROM attendance_logs
+             WHERE user_id = ? AND user_type = ? AND type = 'In'
+               AND DATE(timestamp) = DATE('now', 'localtime')
+             LIMIT 1`,
+            [id, userType],
+            (err, todayCheckIn) => {
+                if (err) {
+                    console.error('Error fetching today check-in:', err);
+                    return res.status(500).json({ error: 'Internal server error' });
+                }
+
+                const isCheckedIn = !!(lastLog && lastLog.type === 'In');
+                // hasCompletedToday = checked in today AND already checked out (or never opened today)
+                // Simpler: if they checked in today and are now checked OUT, they are done for the day
+                const checkedInToday = !!todayCheckIn;
+                const hasCompletedToday = checkedInToday && !isCheckedIn;
+
+                res.json({
+                    isCheckedIn,
+                    hasCompletedToday,
+                    lastLog: lastLog || null
+                });
+            }
+        );
     });
 });
 

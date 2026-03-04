@@ -214,7 +214,7 @@ router.get('/my-loans', authenticateToken, async (req, res) => {
     const { id, userType } = req.user;
     try {
         const loans = await dbAll(
-            `SELECT bl.*, b.book_name, b.book_barcode, b.author, b.publisher
+            `SELECT bl.*, b.book_name, b.book_barcode, b.author, b.publisher, b.book_cover
              FROM borrow_logs bl
              JOIN books b ON bl.book_id = b.id
              WHERE bl.user_id = ? AND bl.user_type = ? AND bl.status = 'Borrowed'

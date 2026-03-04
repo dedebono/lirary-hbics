@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, BookOpen, Users, FileText, TrendingUp, Scan, Home, ClipboardList } from 'lucide-react';
+import { LogOut, BookOpen, Users, FileText, TrendingUp, Scan, Home, ClipboardList, BookOpenCheck } from 'lucide-react';
 import api from '../utils/api';
 import BookManagement from './admin/BookManagement';
 import UserManagement from './admin/UserManagement';
@@ -10,6 +10,7 @@ import AttendanceScanner from '../components/AttendanceScanner';
 import AttendanceLogs from './admin/AttendanceLogs';
 import BorrowBook from './admin/BorrowBook';
 import BorrowLogs from './admin/BorrowLogs';
+import EbookManagement from './admin/EbookManagement';
 import DigitalClock from '../components/DigitalClock';
 
 const AdminDashboard = () => {
@@ -135,6 +136,10 @@ const AdminDashboard = () => {
                                 <Scan className="w-5 h-5" />
                                 Attendance Scanner
                             </Link>
+                            <Link to="/admin/ebooks" className="btn-primary flex items-center justify-center gap-2">
+                                <BookOpenCheck className="w-5 h-5" />
+                                E-Books
+                            </Link>
                         </div>
                     </div>
 
@@ -175,6 +180,7 @@ const AdminDashboard = () => {
                     <NavLink to="/admin/scanner" icon={Scan}>Attendance Scanner</NavLink>
                     <NavLink to="/admin/borrow-logs" icon={ClipboardList}>Borrow Reports</NavLink>
                     <NavLink to="/admin/attendance-logs" icon={ClipboardList}>Attendance Logs</NavLink>
+                    <NavLink to="/admin/ebooks" icon={BookOpenCheck}>E-Books</NavLink>
                 </nav>
 
                 <div className="p-4 border-t bg-white shrink-0">
@@ -206,6 +212,7 @@ const AdminDashboard = () => {
                         <Route path="/scanner" element={<AttendanceScanner />} />
                         <Route path="/borrow-logs" element={<BorrowLogs />} />
                         <Route path="/attendance-logs" element={<AttendanceLogs />} />
+                        <Route path="/ebooks" element={<EbookManagement />} />
                     </Routes>
                 </main>
             </div>

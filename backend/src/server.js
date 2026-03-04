@@ -8,6 +8,7 @@ import attendanceRoutes from './routes/attendance.routes.js';
 import borrowRoutes from './routes/borrow.routes.js';
 import ebooksRoutes from './routes/ebooks.routes.js';
 import importRoutes from './routes/import.routes.js';
+import getDb from './database/db.js';
 
 import multer from 'multer';
 import path from 'path';
@@ -89,7 +90,13 @@ app.get('/', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
+    res.json({
+        status: 'ok',
+        uptime: `${Math.floor(process.uptime())}s`,
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+        node: process.version,
+    });
 });
 
 app.get('/api', (req, res) => {
@@ -98,7 +105,14 @@ app.get('/api', (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', message: 'Library Management System API is running' });
+    res.json({
+        status: 'ok',
+        message: 'Library Management System API is running',
+        uptime: `${Math.floor(process.uptime())}s`,
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+        node: process.version,
+    });
 });
 
 // Error handling middleware
@@ -122,8 +136,28 @@ app.use((req, res) => {
     res.status(404).json({ error: 'Route not found' });
 });
 
+// Migrate ebooks table: add school_level + allowed_classes if not present
+const runEbookMigrations = () => {
+    const db = getDb();
+    db.run(`ALTER TABLE ebooks ADD COLUMN school_level TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+            console.error('Migration error (school_level):', err.message);
+        } else if (!err) {
+            console.log('✅ ebooks.school_level column added');
+        }
+    });
+    db.run(`ALTER TABLE ebooks ADD COLUMN allowed_classes TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+            console.error('Migration error (allowed_classes):', err.message);
+        } else if (!err) {
+            console.log('✅ ebooks.allowed_classes column added');
+        }
+    });
+};
+
 // Start server
 app.listen(PORT, () => {
+    runEbookMigrations();
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📚 Library Management System API`);
     console.log(`\n📝 Available endpoints:`);
@@ -140,3 +174,4 @@ app.listen(PORT, () => {
 });
 
 export default app;
+

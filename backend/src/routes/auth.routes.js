@@ -53,7 +53,8 @@ router.post('/login', [
             name: user.name,
             role: role,
             userType: userType,
-            school_level: user.school_level
+            school_level: user.school_level,
+            ...(userType === 'student' && { class: user.class })
         });
 
         console.log('Login successful:', { username, role });

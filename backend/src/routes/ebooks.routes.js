@@ -43,13 +43,27 @@ const upload = multer({
     }
 });
 
-// Get all e-books
+// Helper: check if this user's class can access an ebook
+// allowed_classes is stored as JSON array string e.g. '["P1-A","P2-B"]', or NULL for all classes
+const canAccessEbook = (ebook, userClass) => {
+    if (!ebook.allowed_classes) return true; // null = all classes
+    try {
+        const classes = JSON.parse(ebook.allowed_classes);
+        if (!Array.isArray(classes) || classes.length === 0) return true;
+        return classes.includes(userClass);
+    } catch {
+        return true; // malformed JSON — grant access
+    }
+};
+
+// Get all e-books (filtered by school + class for students)
 router.get('/', authenticateToken, (req, res) => {
     const { category, search } = req.query;
+    const { school_level, userType, class: userClass } = req.user;
     const db = getDb();
 
-    let query = 'SELECT id, title, category, created_at FROM ebooks WHERE 1=1';
-    const params = [];
+    let query = 'SELECT id, title, category, allowed_classes, created_at FROM ebooks WHERE school_level = ?';
+    const params = [school_level];
 
     if (category) {
         query += ' AND category = ?';
@@ -68,16 +82,25 @@ router.get('/', authenticateToken, (req, res) => {
             console.error('Error fetching e-books:', err);
             return res.status(500).json({ error: 'Internal server error' });
         }
-        res.json({ ebooks: ebooks || [] });
+
+        let result = ebooks || [];
+
+        // Students: further filter by class visibility
+        if (userType === 'student' && userClass) {
+            result = result.filter(eb => canAccessEbook(eb, userClass));
+        }
+
+        res.json({ ebooks: result });
     });
 });
 
-// Get e-book by ID
+// Get e-book by ID (school scoped)
 router.get('/:id', authenticateToken, (req, res) => {
     const { id } = req.params;
+    const { school_level, userType, class: userClass } = req.user;
     const db = getDb();
 
-    db.get('SELECT id, title, category, created_at FROM ebooks WHERE id = ?', [id], (err, ebook) => {
+    db.get('SELECT id, title, category, allowed_classes, created_at FROM ebooks WHERE id = ? AND school_level = ?', [id, school_level], (err, ebook) => {
         if (err) {
             console.error('Error fetching e-book:', err);
             return res.status(500).json({ error: 'Internal server error' });
@@ -85,20 +108,21 @@ router.get('/:id', authenticateToken, (req, res) => {
         if (!ebook) {
             return res.status(404).json({ error: 'E-book not found' });
         }
+        if (userType === 'student' && !canAccessEbook(ebook, userClass)) {
+            return res.status(403).json({ error: 'Access denied for your class' });
+        }
         res.json({ ebook });
     });
 });
 
 // Upload e-book (Admin only)
+// Body: title (required), category (optional), allowed_classes (JSON array string or "all")
 router.post('/', authenticateToken, requireAdmin, upload.single('file'), [
     body('title').notEmpty().withMessage('Title is required')
 ], (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        // Delete uploaded file if validation fails
-        if (req.file) {
-            fs.unlinkSync(req.file.path);
-        }
+        if (req.file) fs.unlinkSync(req.file.path);
         return res.status(400).json({ errors: errors.array() });
     }
 
@@ -106,22 +130,29 @@ router.post('/', authenticateToken, requireAdmin, upload.single('file'), [
         return res.status(400).json({ error: 'PDF file is required' });
     }
 
-    const { title, category } = req.body;
+    const { title, category, allowed_classes } = req.body;
+    const { school_level } = req.user;
     const filePath = req.file.filename;
     const db = getDb();
 
-    const query = `
-      INSERT INTO ebooks (title, file_path, category)
-      VALUES (?, ?, ?)
-    `;
+    // allowed_classes: "all" or a JSON array string like '["P1-A","P2-B"]'
+    // Store NULL for "all classes", otherwise store the JSON string
+    let classesValue = null;
+    if (allowed_classes && allowed_classes !== 'all') {
+        try {
+            const parsed = JSON.parse(allowed_classes);
+            classesValue = Array.isArray(parsed) && parsed.length > 0 ? JSON.stringify(parsed) : null;
+        } catch {
+            classesValue = null;
+        }
+    }
 
-    db.run(query, [title, filePath, category || null], function (err) {
+    const query = `INSERT INTO ebooks (title, file_path, category, school_level, allowed_classes) VALUES (?, ?, ?, ?, ?)`;
+
+    db.run(query, [title, filePath, category || null, school_level, classesValue], function (err) {
         if (err) {
             console.error('Error uploading e-book:', err);
-            // Delete uploaded file if database insert fails
-            if (req.file) {
-                fs.unlinkSync(req.file.path);
-            }
+            if (req.file) fs.unlinkSync(req.file.path);
             return res.status(500).json({ error: 'Internal server error' });
         }
         res.status(201).json({
@@ -131,18 +162,22 @@ router.post('/', authenticateToken, requireAdmin, upload.single('file'), [
     });
 });
 
-// Stream e-book file
+// Stream e-book file (school + class scoped)
 router.get('/:id/read', authenticateToken, (req, res) => {
     const { id } = req.params;
+    const { school_level, userType, class: userClass } = req.user;
     const db = getDb();
 
-    db.get('SELECT * FROM ebooks WHERE id = ?', [id], (err, ebook) => {
+    db.get('SELECT * FROM ebooks WHERE id = ? AND school_level = ?', [id, school_level], (err, ebook) => {
         if (err) {
             console.error('Error reading e-book:', err);
             return res.status(500).json({ error: 'Internal server error' });
         }
         if (!ebook) {
             return res.status(404).json({ error: 'E-book not found' });
+        }
+        if (userType === 'student' && !canAccessEbook(ebook, userClass)) {
+            return res.status(403).json({ error: 'Access denied for your class' });
         }
 
         const filePath = path.join(__dirname, '..', '..', 'uploads', 'ebooks', ebook.file_path);
@@ -152,15 +187,11 @@ router.get('/:id/read', authenticateToken, (req, res) => {
         }
 
         // Log the read access
-        const logQuery = `
-          INSERT INTO ebook_read_logs (user_id, user_type, ebook_id)
-          VALUES (?, ?, ?)
-        `;
+        const logQuery = `INSERT INTO ebook_read_logs (user_id, user_type, ebook_id) VALUES (?, ?, ?)`;
         db.run(logQuery, [req.user.id, req.user.userType, id], (err) => {
             if (err) console.error('Error logging e-book read:', err);
         });
 
-        // Stream the PDF file
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="${ebook.title}.pdf"`);
 
@@ -169,12 +200,13 @@ router.get('/:id/read', authenticateToken, (req, res) => {
     });
 });
 
-// Delete e-book (Admin only)
+// Delete e-book (Admin only, school scoped)
 router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
     const { id } = req.params;
+    const { school_level } = req.user;
     const db = getDb();
 
-    db.get('SELECT * FROM ebooks WHERE id = ?', [id], (err, ebook) => {
+    db.get('SELECT * FROM ebooks WHERE id = ? AND school_level = ?', [id, school_level], (err, ebook) => {
         if (err) {
             console.error('Error finding e-book for deletion:', err);
             return res.status(500).json({ error: 'Internal server error' });
@@ -183,13 +215,11 @@ router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
             return res.status(404).json({ error: 'E-book not found' });
         }
 
-        // Delete file from filesystem
         const filePath = path.join(__dirname, '..', '..', 'uploads', 'ebooks', ebook.file_path);
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         }
 
-        // Delete from database
         db.run('DELETE FROM ebooks WHERE id = ?', [id], (err) => {
             if (err) {
                 console.error('Error deleting e-book record:', err);
@@ -200,19 +230,21 @@ router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
     });
 });
 
-// Get e-book read logs (Admin only)
+// Get e-book read logs (Admin only, school scoped)
 router.get('/logs/all', authenticateToken, requireAdmin, (req, res) => {
+    const { school_level } = req.user;
     const db = getDb();
 
     const query = `
       SELECT erl.*, e.title as ebook_title
       FROM ebook_read_logs erl
       JOIN ebooks e ON erl.ebook_id = e.id
+      WHERE e.school_level = ?
       ORDER BY erl.timestamp DESC
       LIMIT 100
     `;
 
-    db.all(query, [], (err, logs) => {
+    db.all(query, [school_level], (err, logs) => {
         if (err) {
             console.error('Error fetching e-book read logs:', err);
             return res.status(500).json({ error: 'Internal server error' });
