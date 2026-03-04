@@ -5,7 +5,7 @@ import { LogOut, BookOpen, Book, Clock, CheckCircle, XCircle, FileText, X } from
 import api from '../utils/api';
 import { formatDate } from '../utils/dateUtils';
 import DigitalClock from '../components/DigitalClock';
-import { getImageUrl } from '../utils/imageUrl';
+import { getImageUrl, getBackendUrl } from '../utils/imageUrl';
 import PdfReader from '../components/PdfReader';
 
 const StudentDashboard = () => {
@@ -260,10 +260,21 @@ const StudentDashboard = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                     {ebooks.map((eb) => (
                                         <div key={eb.id} className="flex flex-col rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow bg-white group">
-                                            {/* PDF cover placeholder */}
-                                            <div className="w-full aspect-[3/4] bg-gradient-to-br from-red-50 to-red-100 flex flex-col items-center justify-center gap-2 group-hover:from-red-100 group-hover:to-red-200 transition-colors">
-                                                <FileText className="w-14 h-14 text-red-400" />
-                                                <span className="text-xs font-bold text-red-400 tracking-widest">PDF</span>
+                                            {/* PDF cover — thumbnail if available, else gradient placeholder */}
+                                            <div className="w-full aspect-[3/4] relative overflow-hidden bg-gradient-to-br from-red-50 to-red-100">
+                                                {eb.thumbnail_path ? (
+                                                    <img
+                                                        src={`${getBackendUrl()}/uploads/ebooks/${eb.thumbnail_path}`}
+                                                        alt={eb.title}
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                                    />
+                                                ) : (
+                                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                                                        <FileText className="w-14 h-14 text-red-400" />
+                                                        <span className="text-xs font-bold text-red-400 tracking-widest">PDF</span>
+                                                    </div>
+                                                )}
                                             </div>
                                             {/* Info + Read button */}
                                             <div className="p-3 flex flex-col gap-2 flex-1">

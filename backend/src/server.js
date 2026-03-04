@@ -153,6 +153,13 @@ const runEbookMigrations = () => {
             console.log('✅ ebooks.allowed_classes column added');
         }
     });
+    db.run(`ALTER TABLE ebooks ADD COLUMN thumbnail_path TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+            console.error('Migration error (thumbnail_path):', err.message);
+        } else if (!err) {
+            console.log('✅ ebooks.thumbnail_path column added');
+        }
+    });
 };
 
 // Start server

@@ -77,6 +77,41 @@ const compressPdfAsync = async (filePath) => {
     }
 };
 
+/**
+ * Generate a JPEG thumbnail from page 1 of a PDF using Ghostscript.
+ * Saves to uploads/ebooks/thumbs/<basename>.jpg
+ * Updates the ebooks DB row with the thumbnail filename.
+ */
+const generateThumbnailAsync = async (filePath, ebookId) => {
+    const thumbDir = path.join(__dirname, '..', '..', 'uploads', 'ebooks', 'thumbs');
+    if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
+
+    const baseName = path.basename(filePath, path.extname(filePath));
+    const thumbFilename = `${baseName}.jpg`;
+    const thumbPath = path.join(thumbDir, thumbFilename);
+
+    try {
+        await execFileAsync('gs', [
+            '-sDEVICE=jpeg',
+            '-dNOPAUSE', '-dBATCH', '-dQUIET',
+            '-dFirstPage=1', '-dLastPage=1',
+            '-r96',                         // 96 dpi — sharp enough for a thumbnail
+            `-dDEVICEWIDTHPOINTS=400`,      // thumbnail width
+            `-dPDFFitPage`,
+            `-sOutputFile=${thumbPath}`,
+            filePath,
+        ]);
+        // Save relative path in DB
+        const db = getDb();
+        db.run('UPDATE ebooks SET thumbnail_path = ? WHERE id = ?', [`thumbs/${thumbFilename}`, ebookId], (err) => {
+            if (err) console.error('[ebook thumb] DB update error:', err.message);
+            else console.log(`[ebook thumb] Generated: ${thumbFilename}`);
+        });
+    } catch (err) {
+        console.warn('[ebook thumb] gs not available, skipping thumbnail:', err.message.split('\n')[0]);
+    }
+};
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -125,7 +160,7 @@ router.get('/', authenticateToken, (req, res) => {
     const { school_level, userType, class: userClass } = req.user;
     const db = getDb();
 
-    let query = 'SELECT id, title, category, allowed_classes, created_at FROM ebooks WHERE school_level = ?';
+    let query = 'SELECT id, title, category, allowed_classes, thumbnail_path, created_at FROM ebooks WHERE school_level = ?';
     const params = [school_level];
 
     if (category) {
@@ -163,7 +198,7 @@ router.get('/:id', authenticateToken, (req, res) => {
     const { school_level, userType, class: userClass } = req.user;
     const db = getDb();
 
-    db.get('SELECT id, title, category, allowed_classes, created_at FROM ebooks WHERE id = ? AND school_level = ?', [id, school_level], (err, ebook) => {
+    db.get('SELECT id, title, category, allowed_classes, thumbnail_path, created_at FROM ebooks WHERE id = ? AND school_level = ?', [id, school_level], (err, ebook) => {
         if (err) {
             console.error('Error fetching e-book:', err);
             return res.status(500).json({ error: 'Internal server error' });
@@ -223,11 +258,12 @@ router.post('/', authenticateToken, requireAdmin, upload.single('file'), [
             message: 'E-book uploaded successfully',
             ebookId: this.lastID
         });
-        // Compress in the background after responding
+        // Run compression + thumbnail generation in background
         const fullPath = path.join(__dirname, '..', '..', 'uploads', 'ebooks', req.file.filename);
-        compressPdfAsync(fullPath).catch(err =>
-            console.error('[ebook compress] Unhandled error:', err.message)
-        );
+        const newId = this.lastID;
+        compressPdfAsync(fullPath)
+            .then(() => generateThumbnailAsync(fullPath, newId))
+            .catch(err => console.error('[ebook post-process] error:', err.message));
     });
 });
 
